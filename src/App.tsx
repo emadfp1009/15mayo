@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { OnboardingScreen } from '@/components/mayu-hub/OnboardingScreen'
 import { ServicesView } from '@/components/mayu-hub/ServicesView'
 import { CommunityDirectory } from '@/components/mayu-hub/CommunityDirectory'
@@ -7,40 +7,63 @@ import { EmergencyView } from '@/components/mayu-hub/EmergencyView'
 import { AdminPanel } from '@/components/mayu-hub/admin/AdminPanel'
 import { StoreRegistration } from '@/components/mayu-hub/StoreRegistration'
 import { NeighborhoodModal } from '@/components/mayu-hub/NeighborhoodModal'
+import { getCurrentUser, logout, logActivity } from '@/lib/mayu-hub/auth'
+import type { UserProfile } from '@/lib/mayu-hub/auth'
 import { demoNeighborhoods, demoStores, demoWorkingHours, demoCategories } from '@/lib/mayu-hub/demo-data'
+import { LogOut } from 'lucide-react'
 import './index.css'
 
 type View = 'onboarding' | 'services' | 'community' | 'store-detail' | 'emergency' | 'admin' | 'register-store'
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('onboarding')
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
   const [showNeighborhoodModal, setShowNeighborhoodModal] = useState(false)
-  const [userName, setUserName] = useState('')
-  const [userPhone, setUserPhone] = useState('')
 
-  const ADMIN_PHONE = '01206777720'
-  const isAdmin = userPhone === ADMIN_PHONE
+  // Check for existing session on mount
+  useEffect(() => {
+    const user = getCurrentUser()
+    if (user) {
+      setCurrentUser(user)
+      setCurrentView('services')
+    }
+  }, [])
 
-  const handleOnboardingComplete = (data: { name: string; phone: string; neighborhoodId: string }) => {
-    setUserName(data.name)
-    setUserPhone(data.phone)
-    setSelectedNeighborhood(data.neighborhoodId)
+  const handleLoginComplete = (user: UserProfile) => {
+    setCurrentUser(user)
     setShowNeighborhoodModal(true)
     setCurrentView('services')
+  }
+
+  const handleLogout = () => {
+    logout()
+    setCurrentUser(null)
+    setCurrentView('onboarding')
   }
 
   const handleStoreClick = (storeId: string) => {
     setSelectedStoreId(storeId)
     setCurrentView('store-detail')
+
+    // Log activity
+    if (currentUser) {
+      const store = demoStores.find(s => s.id === storeId)
+      logActivity({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        action: 'view_store',
+        targetId: storeId,
+        targetName: store?.nameAr,
+      })
+    }
   }
 
   const selectedStore = demoStores.find(s => s.id === selectedStoreId)
 
-  // Onboarding
-  if (currentView === 'onboarding') {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />
+  // Onboarding / Login
+  if (currentView === 'onboarding' || !currentUser) {
+    return <OnboardingScreen onComplete={handleLoginComplete} />
   }
 
   return (
@@ -54,7 +77,7 @@ function App() {
             </div>
             <div>
               <h1 className="text-sm font-bold leading-tight">مايو هب</h1>
-              <p className="text-[10px] text-muted-foreground">أهلاً {userName} 👋</p>
+              <p className="text-[10px] text-muted-foreground">أهلاً {currentUser.name} 👋</p>
             </div>
           </div>
 
@@ -66,7 +89,7 @@ function App() {
               >
                 + سجل محلك
               </button>
-              {isAdmin && (
+              {currentUser.isAdmin && (
                 <button
                   onClick={() => setCurrentView('admin')}
                   className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -74,6 +97,13 @@ function App() {
                   ⚙️
                 </button>
               )}
+              <button
+                onClick={handleLogout}
+                className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                title="تسجيل خروج"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>
@@ -81,11 +111,11 @@ function App() {
 
       {/* Main content */}
       <main className="max-w-lg mx-auto px-4 py-4">
-        {currentView === 'services' && selectedNeighborhood && (
+        {currentView === 'services' && (
           <div className="pb-24 animate-fade-in">
             <ServicesView
-              primaryNeighborhoodId={selectedNeighborhood}
-              onBack={() => setCurrentView('onboarding')}
+              primaryNeighborhoodId={currentUser.neighborhoodId}
+              onBack={handleLogout}
               onStoreClick={handleStoreClick}
             />
           </div>
@@ -103,7 +133,7 @@ function App() {
           </div>
         )}
 
-        {currentView === 'admin' && (
+        {currentView === 'admin' && currentUser.isAdmin && (
           <div className="pb-4 animate-fade-in">
             <AdminPanel onBack={() => setCurrentView('services')} />
           </div>
@@ -134,7 +164,7 @@ function App() {
       </main>
 
       {/* Bottom Navigation */}
-      {!['onboarding', 'store-detail', 'admin', 'register-store'].includes(currentView) && (
+      {!['store-detail', 'admin', 'register-store'].includes(currentView) && (
         <div className="fixed bottom-0 left-0 right-0 glass border-t border-border/30 px-4 pt-2 pb-3 safe-bottom z-50">
           <div className="max-w-lg mx-auto flex justify-around">
             {[
@@ -162,9 +192,9 @@ function App() {
       )}
 
       {/* Neighborhood Modal */}
-      {showNeighborhoodModal && selectedNeighborhood && (
+      {showNeighborhoodModal && (
         <NeighborhoodModal
-          primaryNeighborhoodId={selectedNeighborhood}
+          primaryNeighborhoodId={currentUser.neighborhoodId}
           onClose={() => setShowNeighborhoodModal(false)}
         />
       )}
