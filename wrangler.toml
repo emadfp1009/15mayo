@@ -1,6 +1,8 @@
-# Cloudflare Pages Configuration
+# Cloudflare Workers Configuration
 name = "15mayo"
 compatibility_date = "2025-05-17"
 
 [assets]
 directory = "./dist"
+html_handling = "auto-trailing-slash"
+not_found_handling = "single-page-application"
