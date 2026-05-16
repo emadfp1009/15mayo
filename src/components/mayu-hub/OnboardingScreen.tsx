@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { demoNeighborhoods } from '@/lib/mayu-hub/demo-data'
+import { ChevronDown, MapPin } from 'lucide-react'
 
 interface OnboardingScreenProps {
   onComplete: (data: { name: string; phone: string; neighborhoodId: string }) => void
@@ -11,9 +12,11 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [neighborhoodId, setNeighborhoodId] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const activeNeighborhoods = demoNeighborhoods.filter(n => n.isActive)
+  const allNeighborhoods = demoNeighborhoods
+  const selectedNeighborhood = allNeighborhoods.find(n => n.id === neighborhoodId)
 
   const handleSubmit = () => {
     const newErrors: Record<string, string> = {}
@@ -70,26 +73,54 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
           </div>
 
-          {/* Neighborhood */}
-          <div className="space-y-1.5">
+          {/* Neighborhood Dropdown */}
+          <div className="space-y-1.5 relative">
             <Label className="text-sm font-medium text-muted-foreground">المجاورة</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {activeNeighborhoods.map(n => (
-                <button
-                  key={n.id}
-                  onClick={() => { setNeighborhoodId(n.id); setErrors(prev => ({ ...prev, neighborhood: '' })) }}
-                  className={`
-                    h-12 rounded-xl text-sm font-medium transition-all duration-200
-                    ${neighborhoodId === n.id
-                      ? 'gradient-primary text-white shadow-lg shadow-blue-500/30 scale-105'
-                      : 'bg-secondary/50 text-foreground hover:bg-secondary'
-                    }
-                  `}
-                >
-                  {n.number}
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              className={`
+                w-full h-12 rounded-xl bg-secondary/50 px-4 flex items-center justify-between
+                text-base transition-all
+                ${neighborhoodId ? 'text-foreground' : 'text-muted-foreground/50'}
+                ${showDropdown ? 'ring-2 ring-primary/50' : ''}
+              `}
+            >
+              <span className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary" />
+                {selectedNeighborhood ? selectedNeighborhood.nameAr : 'اختر مجاورتك...'}
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown */}
+            {showDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-border/50 max-h-48 overflow-y-auto z-50 animate-slide-down">
+                {allNeighborhoods.map(n => (
+                  <button
+                    key={n.id}
+                    onClick={() => {
+                      setNeighborhoodId(n.id)
+                      setShowDropdown(false)
+                      setErrors(prev => ({ ...prev, neighborhood: '' }))
+                    }}
+                    className={`
+                      w-full px-4 py-3 text-right text-sm flex items-center justify-between
+                      transition-colors hover:bg-primary/5
+                      ${neighborhoodId === n.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'}
+                      ${!n.isActive ? 'opacity-50' : ''}
+                    `}
+                  >
+                    <span>{n.nameAr}</span>
+                    <span className="flex items-center gap-2">
+                      {n.isActive && (
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                      )}
+                      {neighborhoodId === n.id && <span className="text-primary">✓</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             {errors.neighborhood && <p className="text-xs text-destructive">{errors.neighborhood}</p>}
           </div>
         </div>

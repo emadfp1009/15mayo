@@ -18,9 +18,14 @@ function App() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
   const [showNeighborhoodModal, setShowNeighborhoodModal] = useState(false)
   const [userName, setUserName] = useState('')
+  const [userPhone, setUserPhone] = useState('')
+
+  const ADMIN_PHONE = '01206777720'
+  const isAdmin = userPhone === ADMIN_PHONE
 
   const handleOnboardingComplete = (data: { name: string; phone: string; neighborhoodId: string }) => {
     setUserName(data.name)
+    setUserPhone(data.phone)
     setSelectedNeighborhood(data.neighborhoodId)
     setShowNeighborhoodModal(true)
     setCurrentView('services')
@@ -61,12 +66,14 @@ function App() {
               >
                 + سجل محلك
               </button>
-              <button
-                onClick={() => setCurrentView('admin')}
-                className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-              >
-                ⚙️
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setCurrentView('admin')}
+                  className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ⚙️
+                </button>
+              )}
             </div>
           )}
         </div>
