@@ -1,0 +1,9 @@
+# Cloudflare Pages Configuration
+name = "mayu-hub"
+compatibility_date = "2025-05-17"
+pages_build_output_dir = "dist"
+
+[vars]
+# Environment variables are set in Cloudflare Dashboard
+# VITE_SUPABASE_URL = "set in dashboard"
+# VITE_SUPABASE_ANON_KEY = "set in dashboard"
