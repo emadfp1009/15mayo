@@ -1,31 +1,43 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { uploadBannerImage } from '@/lib/mayu-hub/storage'
 import { demoBanners } from '@/lib/mayu-hub/demo-data'
 import type { BannerAd } from '@/lib/mayu-hub/types'
-import { Image, Plus, Trash2 } from 'lucide-react'
+import { Upload, Trash2, Loader2 } from 'lucide-react'
 
 export function BannerManagement() {
   const [banners, setBanners] = useState<BannerAd[]>(demoBanners)
-  const [newUrl, setNewUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleAdd = () => {
-    if (!newUrl.trim()) return
-    const newBanner: BannerAd = {
-      id: `banner-${Date.now()}`,
-      imageUrl: newUrl,
-      targetType: 'external',
-      targetStoreId: null,
-      targetUrl: '#',
-      startsAt: new Date().toISOString().split('T')[0],
-      endsAt: '2026-12-31',
-      isActive: true,
-      sortOrder: banners.length + 1,
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (banners.length >= 6) { setError('الحد الأقصى 6 بانرات'); return }
+
+    setUploading(true)
+    setError('')
+
+    try {
+      const imageUrl = await uploadBannerImage(file)
+      const newBanner: BannerAd = {
+        id: `banner-${Date.now()}`,
+        imageUrl,
+        targetType: 'external',
+        targetStoreId: null,
+        targetUrl: '#',
+        startsAt: new Date().toISOString().split('T')[0],
+        endsAt: '2026-12-31',
+        isActive: true,
+        sortOrder: banners.length + 1,
+      }
+      setBanners(prev => [...prev, newBanner])
+    } catch (err: any) {
+      setError(err.message || 'فشل رفع الصورة')
+    } finally {
+      setUploading(false)
     }
-    setBanners(prev => [...prev, newBanner])
-    setNewUrl('')
   }
 
   const handleDelete = (id: string) => {
@@ -35,7 +47,7 @@ export function BannerManagement() {
   return (
     <div className="space-y-4">
       <h3 className="font-semibold">🖼️ إدارة البانرات ({banners.length}/6)</h3>
-      <p className="text-xs text-muted-foreground">أضف حتى 6 صور بانر — بتدور تلقائي كل 3 ثواني</p>
+      <p className="text-xs text-muted-foreground">ارفع حتى 6 صور بانر — بتدور تلقائي كل 3 ثواني</p>
 
       {/* Current banners */}
       <div className="grid grid-cols-2 gap-2">
@@ -59,32 +71,36 @@ export function BannerManagement() {
         ))}
       </div>
 
-      {/* Add new */}
+      {/* Upload new */}
       {banners.length < 6 && (
-        <Card className="p-4 space-y-3">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            إضافة بانر جديد
-          </h4>
-          <div className="space-y-2">
-            <Label className="text-xs">رابط الصورة</Label>
-            <Input
-              value={newUrl}
-              onChange={e => setNewUrl(e.target.value)}
-              placeholder="https://..."
-              dir="ltr"
-              className="text-xs"
+        <Card className="p-6">
+          <label className="flex flex-col items-center gap-3 cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={uploading}
             />
-            {newUrl && (
-              <img src={newUrl} alt="preview" className="w-full h-20 object-cover rounded-lg" />
+            {uploading ? (
+              <>
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">جاري الرفع...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-blue-500" />
+                </div>
+                <p className="text-sm font-medium">اضغط لرفع صورة بانر</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG — حتى 5MB</p>
+              </>
             )}
-          </div>
-          <Button onClick={handleAdd} className="w-full" disabled={!newUrl.trim()}>
-            <Image className="w-4 h-4 ml-2" />
-            إضافة
-          </Button>
+          </label>
         </Card>
       )}
+
+      {error && <p className="text-xs text-destructive text-center">{error}</p>}
     </div>
   )
 }

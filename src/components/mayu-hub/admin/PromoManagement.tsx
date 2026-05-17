@@ -3,7 +3,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Megaphone } from 'lucide-react'
+import { uploadImage } from '@/lib/mayu-hub/storage'
+import { Megaphone, Upload, Loader2 } from 'lucide-react'
 
 interface PromoConfig {
   imageUrl: string
@@ -61,14 +62,35 @@ export function PromoManagement() {
       {config.enabled && (
         <Card className="p-4 space-y-3">
           <div className="space-y-2">
-            <Label className="text-xs">صورة الإعلان (رابط)</Label>
-            <Input
-              value={config.imageUrl}
-              onChange={e => setConfig(prev => ({ ...prev, imageUrl: e.target.value }))}
-              placeholder="https://..."
-              dir="ltr"
-              className="text-xs"
-            />
+            <Label className="text-xs">صورة الإعلان</Label>
+            <div className="flex gap-2">
+              <Input
+                value={config.imageUrl}
+                onChange={e => setConfig(prev => ({ ...prev, imageUrl: e.target.value }))}
+                placeholder="رابط الصورة أو ارفع من جهازك..."
+                dir="ltr"
+                className="text-xs flex-1"
+              />
+              <label className="btn-modern px-3 py-2 bg-secondary text-xs cursor-pointer flex items-center gap-1 shrink-0 rounded-lg">
+                <Upload className="w-3 h-3" />
+                رفع
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    try {
+                      const url = await uploadImage(file, 'promos')
+                      setConfig(prev => ({ ...prev, imageUrl: url }))
+                    } catch (err) {
+                      console.error(err)
+                    }
+                  }}
+                />
+              </label>
+            </div>
             {config.imageUrl && (
               <img src={config.imageUrl} alt="preview" className="w-full h-32 object-cover rounded-lg" />
             )}
