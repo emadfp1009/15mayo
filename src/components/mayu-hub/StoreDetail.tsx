@@ -99,23 +99,46 @@ export function StoreDetail({ store, workingHours, neighborhoodName, categoryNam
         <div className="space-y-2">
           {workingHours.length === 0 ? (
             <p className="text-sm text-muted-foreground">لم يتم تحديد مواعيد العمل</p>
-          ) : (
-            dayNames.map((dayName, dayIndex) => {
+          ) : (() => {
+            // Check if all open days have same hours
+            const openDays = workingHours.filter(wh => !wh.isClosed)
+            const closedDays = workingHours.filter(wh => wh.isClosed)
+            const allSameHours = openDays.length > 0 && openDays.every(
+              wh => wh.openTime === openDays[0].openTime && wh.closeTime === openDays[0].closeTime
+            )
+
+            if (allSameHours && openDays.length > 0) {
+              const is24h = openDays[0].openTime === '00:00' && (openDays[0].closeTime === '23:59' || openDays[0].closeTime === '00:00')
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="font-medium">
+                      {is24h ? 'شغالين كل يوم 24 ساعة' : `شغالين كل يوم من ${openDays[0].openTime} إلى ${openDays[0].closeTime}`}
+                    </span>
+                  </div>
+                  {closedDays.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-red-400" />
+                      <span>إجازة: {closedDays.map(d => dayNames[d.dayOfWeek]).join('، ')}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            // Different hours per day
+            return dayNames.map((dayName, dayIndex) => {
               const hours = workingHours.find(wh => wh.dayOfWeek === dayIndex)
               const isToday = new Date().getDay() === dayIndex
               return (
                 <div key={dayIndex} className={`flex justify-between text-sm ${isToday ? 'font-semibold text-primary' : ''}`}>
                   <span>{dayName}</span>
-                  <span>
-                    {hours && !hours.isClosed
-                      ? `${hours.openTime} - ${hours.closeTime}`
-                      : 'مغلق'
-                    }
-                  </span>
+                  <span>{hours && !hours.isClosed ? `${hours.openTime} - ${hours.closeTime}` : '🔴 إجازة'}</span>
                 </div>
               )
             })
-          )}
+          })()}
         </div>
       </Card>
 

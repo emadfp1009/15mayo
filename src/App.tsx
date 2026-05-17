@@ -8,13 +8,14 @@ import { AdminPanel } from '@/components/mayu-hub/admin/AdminPanel'
 import { StoreRegistration } from '@/components/mayu-hub/StoreRegistration'
 import { NeighborhoodModal } from '@/components/mayu-hub/NeighborhoodModal'
 import { PromoPopup } from '@/components/mayu-hub/PromoPopup'
+import { ProfileScreen } from '@/components/mayu-hub/ProfileScreen'
 import { getCurrentUser, logout, logActivity } from '@/lib/mayu-hub/auth'
 import type { UserProfile } from '@/lib/mayu-hub/auth'
 import { demoNeighborhoods, demoStores, demoWorkingHours, demoCategories } from '@/lib/mayu-hub/demo-data'
 import { LogOut } from 'lucide-react'
 import './index.css'
 
-type View = 'onboarding' | 'services' | 'community' | 'store-detail' | 'emergency' | 'admin' | 'register-store'
+type View = 'onboarding' | 'services' | 'community' | 'store-detail' | 'emergency' | 'admin' | 'register-store' | 'profile'
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('onboarding')
@@ -98,13 +99,6 @@ function App() {
                   ⚙️
                 </button>
               )}
-              <button
-                onClick={handleLogout}
-                className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                title="تسجيل خروج"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           )}
         </div>
@@ -146,6 +140,16 @@ function App() {
           </div>
         )}
 
+        {currentView === 'profile' && (
+          <div className="pb-24 animate-fade-in">
+            <ProfileScreen
+              user={currentUser}
+              onBack={() => setCurrentView('services')}
+              onUserUpdate={(updated) => setCurrentUser(updated)}
+            />
+          </div>
+        )}
+
         {currentView === 'store-detail' && selectedStore && (
           <div className="pb-4 animate-fade-in">
             <StoreDetail
@@ -172,6 +176,7 @@ function App() {
               { view: 'services' as View, icon: '🏪', label: 'الخدمات', color: 'text-primary' },
               { view: 'emergency' as View, icon: '🆘', label: 'طوارئ', color: 'text-red-500' },
               { view: 'community' as View, icon: '🏛️', label: 'الدليل', color: 'text-primary' },
+              { view: 'profile' as View, icon: '👤', label: 'حسابي', color: 'text-primary' },
             ].map(item => (
               <button
                 key={item.view}

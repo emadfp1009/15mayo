@@ -320,14 +320,14 @@ export const demoBanners: BannerAd[] = [
   },
 ]
 
-// Demo working hours (all stores open 9am-10pm Saturday-Thursday)
+// Demo working hours (all stores open every day 00:00-00:00 = 24 hours, Friday off)
 export const demoWorkingHours = demoStores.map(store => 
-  [6, 0, 1, 2, 3, 4].map(day => ({ // Sat=6, Sun=0, Mon=1...Thu=4
+  [0, 1, 2, 3, 4, 5, 6].map(day => ({
     id: `wh-${store.id}-${day}`,
     storeId: store.id,
     dayOfWeek: day,
-    openTime: '09:00',
-    closeTime: '22:00',
-    isClosed: false,
+    openTime: '00:00',
+    closeTime: '23:59',
+    isClosed: day === 5, // Friday = off
   }))
 ).flat()

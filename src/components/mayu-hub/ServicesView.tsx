@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { StoreCard } from './StoreCard'
 import { SearchBar } from './SearchBar'
 import { BannerCarousel } from './BannerCarousel'
+import { CategoryScroller } from './CategoryScroller'
 import { computeNeighborhoodCircle } from '@/lib/mayu-hub/neighborhood-circle'
 import { computeStoreStatus } from '@/lib/mayu-hub/store-status'
 import { filterStores, rankSearchResults, sortWithPremiumFirst } from '@/lib/mayu-hub/search'
@@ -92,6 +93,12 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
 
       {/* Banner carousel */}
       <BannerCarousel banners={activeBanners} />
+
+      {/* Categories - circular scrollable */}
+      <CategoryScroller
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+      />
 
       {/* Search */}
       <SearchBar
