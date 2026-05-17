@@ -19,6 +19,7 @@ export interface StoreProfile {
   logoUrl: string | null;
   storefrontPhotoUrl: string | null;
   categoryId: string | null;
+  address: string | null;
   isPremium: boolean;
   premiumStartedAt: string | null;
   premiumExpiresAt: string | null;

@@ -7,6 +7,7 @@ import { EmergencyView } from '@/components/mayu-hub/EmergencyView'
 import { AdminPanel } from '@/components/mayu-hub/admin/AdminPanel'
 import { StoreRegistration } from '@/components/mayu-hub/StoreRegistration'
 import { NeighborhoodModal } from '@/components/mayu-hub/NeighborhoodModal'
+import { PromoPopup } from '@/components/mayu-hub/PromoPopup'
 import { getCurrentUser, logout, logActivity } from '@/lib/mayu-hub/auth'
 import type { UserProfile } from '@/lib/mayu-hub/auth'
 import { demoNeighborhoods, demoStores, demoWorkingHours, demoCategories } from '@/lib/mayu-hub/demo-data'
@@ -198,6 +199,9 @@ function App() {
           onClose={() => setShowNeighborhoodModal(false)}
         />
       )}
+
+      {/* Promo Popup */}
+      <PromoPopup onAction={() => setCurrentView('register-store')} />
     </div>
   )
 }
