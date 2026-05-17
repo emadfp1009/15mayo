@@ -1,15 +1,30 @@
 import { useState } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AdminDashboard } from './AdminDashboard'
 import { StoreManagement } from './StoreManagement'
 import { NeighborhoodManagement } from './NeighborhoodManagement'
 import { ApprovalQueue } from './ApprovalQueue'
-import { ArrowRight } from 'lucide-react'
+import { UserManagement } from './UserManagement'
+import { SettingsPanel } from './SettingsPanel'
+import { ArrowRight, LayoutDashboard, Store, Users, MapPin, CheckCircle, Settings } from 'lucide-react'
 
 interface AdminPanelProps {
   onBack: () => void
 }
 
+type AdminTab = 'dashboard' | 'approvals' | 'stores' | 'users' | 'neighborhoods' | 'settings'
+
 export function AdminPanel({ onBack }: AdminPanelProps) {
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
+
+  const tabs: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'المراقبة', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: 'approvals', label: 'الموافقات', icon: <CheckCircle className="w-4 h-4" /> },
+    { id: 'stores', label: 'المتاجر', icon: <Store className="w-4 h-4" /> },
+    { id: 'users', label: 'المستخدمين', icon: <Users className="w-4 h-4" /> },
+    { id: 'neighborhoods', label: 'المجاورات', icon: <MapPin className="w-4 h-4" /> },
+    { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-4 h-4" /> },
+  ]
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -20,25 +35,35 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
         <h2 className="text-lg font-bold">⚙️ لوحة الإدارة</h2>
       </div>
 
-      <Tabs defaultValue="approvals" dir="rtl">
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="approvals">الموافقات</TabsTrigger>
-          <TabsTrigger value="stores">المتاجر</TabsTrigger>
-          <TabsTrigger value="neighborhoods">المجاورات</TabsTrigger>
-        </TabsList>
+      {/* Tab Navigation */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`
+              shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all
+              ${activeTab === tab.id
+                ? 'gradient-primary text-white shadow-md shadow-blue-500/20'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }
+            `}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="approvals" className="mt-4">
-          <ApprovalQueue />
-        </TabsContent>
-
-        <TabsContent value="stores" className="mt-4">
-          <StoreManagement />
-        </TabsContent>
-
-        <TabsContent value="neighborhoods" className="mt-4">
-          <NeighborhoodManagement />
-        </TabsContent>
-      </Tabs>
+      {/* Tab Content */}
+      <div className="animate-fade-in">
+        {activeTab === 'dashboard' && <AdminDashboard />}
+        {activeTab === 'approvals' && <ApprovalQueue />}
+        {activeTab === 'stores' && <StoreManagement />}
+        {activeTab === 'users' && <UserManagement />}
+        {activeTab === 'neighborhoods' && <NeighborhoodManagement />}
+        {activeTab === 'settings' && <SettingsPanel />}
+      </div>
     </div>
   )
 }
