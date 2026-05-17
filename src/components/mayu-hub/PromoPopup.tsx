@@ -15,9 +15,9 @@ const demoPromo: PromoData = {
   id: 'promo-1',
   imageUrl: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=600&h=400&fit=crop&q=80',
   title: '🎉 عروض افتتاح مايو هب!',
-  description: 'سجل محلك مجاناً واحصل على شهر مميز هدية — العرض لفترة محدودة',
-  buttonText: 'سجل محلك الآن',
-  buttonLink: '#register',
+  description: 'صيدلية الشفاء — خصم 20% على كل الأدوية هذا الأسبوع',
+  buttonText: 'شوف العرض',
+  buttonLink: 'store-1',
 }
 
 const PROMO_DISMISSED_KEY = 'mayu_hub_promo_dismissed'

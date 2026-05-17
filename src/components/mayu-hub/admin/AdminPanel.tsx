@@ -5,13 +5,16 @@ import { NeighborhoodManagement } from './NeighborhoodManagement'
 import { ApprovalQueue } from './ApprovalQueue'
 import { UserManagement } from './UserManagement'
 import { SettingsPanel } from './SettingsPanel'
-import { ArrowRight, LayoutDashboard, Store, Users, MapPin, CheckCircle, Settings } from 'lucide-react'
+import { BannerManagement } from './BannerManagement'
+import { PromoManagement } from './PromoManagement'
+import { ExcelUpload } from './ExcelUpload'
+import { ArrowRight, LayoutDashboard, Store, Users, MapPin, CheckCircle, Settings, Image, Megaphone, FileSpreadsheet } from 'lucide-react'
 
 interface AdminPanelProps {
   onBack: () => void
 }
 
-type AdminTab = 'dashboard' | 'approvals' | 'stores' | 'users' | 'neighborhoods' | 'settings'
+type AdminTab = 'dashboard' | 'approvals' | 'stores' | 'users' | 'neighborhoods' | 'banners' | 'promo' | 'excel' | 'settings'
 
 export function AdminPanel({ onBack }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
@@ -21,6 +24,9 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     { id: 'approvals', label: 'الموافقات', icon: <CheckCircle className="w-4 h-4" /> },
     { id: 'stores', label: 'المتاجر', icon: <Store className="w-4 h-4" /> },
     { id: 'users', label: 'المستخدمين', icon: <Users className="w-4 h-4" /> },
+    { id: 'banners', label: 'البانرات', icon: <Image className="w-4 h-4" /> },
+    { id: 'promo', label: 'الإعلان', icon: <Megaphone className="w-4 h-4" /> },
+    { id: 'excel', label: 'رفع Excel', icon: <FileSpreadsheet className="w-4 h-4" /> },
     { id: 'neighborhoods', label: 'المجاورات', icon: <MapPin className="w-4 h-4" /> },
     { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-4 h-4" /> },
   ]
@@ -61,6 +67,9 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
         {activeTab === 'approvals' && <ApprovalQueue />}
         {activeTab === 'stores' && <StoreManagement />}
         {activeTab === 'users' && <UserManagement />}
+        {activeTab === 'banners' && <BannerManagement />}
+        {activeTab === 'promo' && <PromoManagement />}
+        {activeTab === 'excel' && <ExcelUpload />}
         {activeTab === 'neighborhoods' && <NeighborhoodManagement />}
         {activeTab === 'settings' && <SettingsPanel />}
       </div>

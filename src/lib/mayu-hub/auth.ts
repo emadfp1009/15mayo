@@ -27,7 +27,7 @@ export interface ActivityLog {
 const USERS_KEY = 'mayu_hub_users'
 const CURRENT_USER_KEY = 'mayu_hub_current_user'
 const ACTIVITY_LOG_KEY = 'mayu_hub_activity_log'
-const ADMIN_PHONE = '01206777720'
+const ADMIN_PHONE = '01206777762'
 const ADMIN_PIN = '1009'
 
 // ============================================

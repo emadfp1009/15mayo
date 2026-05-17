@@ -34,7 +34,12 @@ function App() {
 
   const handleLoginComplete = (user: UserProfile) => {
     setCurrentUser(user)
-    setShowNeighborhoodModal(true)
+    // Only show neighborhood modal on first ever login (no previous session)
+    const isFirstLogin = !localStorage.getItem('mayu_hub_seen_neighborhood_modal')
+    if (isFirstLogin) {
+      setShowNeighborhoodModal(true)
+      localStorage.setItem('mayu_hub_seen_neighborhood_modal', 'true')
+    }
     setCurrentView('services')
   }
 
