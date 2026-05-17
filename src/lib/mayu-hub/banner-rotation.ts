@@ -31,6 +31,6 @@ export function getActiveBanners(
   // Sort by sort_order ascending
   active.sort((a, b) => a.sortOrder - b.sortOrder)
 
-  // Limit to 5
-  return active.slice(0, 5)
+  // Limit to 6 (configurable via settings)
+  return active.slice(0, 6)
 }

@@ -6,6 +6,7 @@
 export interface UserProfile {
   id: string
   name: string
+  username: string
   phone: string
   pin: string
   neighborhoodId: string
@@ -40,6 +41,7 @@ export function getUsers(): UserProfile[] {
     const admin: UserProfile = {
       id: 'admin-1',
       name: 'Admin',
+      username: 'admin',
       phone: ADMIN_PHONE,
       pin: ADMIN_PIN,
       neighborhoodId: 'neighborhood-1',
@@ -57,7 +59,16 @@ export function findUserByPhone(phone: string): UserProfile | null {
   return users.find(u => u.phone === phone) ?? null
 }
 
-export function registerUser(data: { name: string; phone: string; pin: string; neighborhoodId: string }): UserProfile {
+export function findUserByUsername(username: string): UserProfile | null {
+  const users = getUsers()
+  return users.find(u => u.username?.toLowerCase() === username.toLowerCase()) ?? null
+}
+
+export function findUserByPhoneOrUsername(identifier: string): UserProfile | null {
+  return findUserByPhone(identifier) ?? findUserByUsername(identifier) ?? null
+}
+
+export function registerUser(data: { name: string; username: string; phone: string; pin: string; neighborhoodId: string }): UserProfile {
   const users = getUsers()
 
   // Check if phone already exists
@@ -65,9 +76,15 @@ export function registerUser(data: { name: string; phone: string; pin: string; n
     throw new Error('رقم الهاتف مسجل بالفعل')
   }
 
+  // Check if username already exists
+  if (users.find(u => u.username?.toLowerCase() === data.username.toLowerCase())) {
+    throw new Error('اسم المستخدم مسجل بالفعل')
+  }
+
   const newUser: UserProfile = {
     id: `user-${Date.now()}`,
     name: data.name,
+    username: data.username,
     phone: data.phone,
     pin: data.pin,
     neighborhoodId: data.neighborhoodId,
@@ -81,7 +98,7 @@ export function registerUser(data: { name: string; phone: string; pin: string; n
 }
 
 export function verifyPin(phone: string, pin: string): UserProfile | null {
-  const user = findUserByPhone(phone)
+  const user = findUserByPhoneOrUsername(phone)
   if (!user) return null
   if (user.pin !== pin) return null
   return user
