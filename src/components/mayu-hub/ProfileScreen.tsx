@@ -12,9 +12,10 @@ interface ProfileScreenProps {
   user: UserProfile
   onBack: () => void
   onUserUpdate: (user: UserProfile) => void
+  onLogout: () => void
 }
 
-export function ProfileScreen({ user, onBack, onUserUpdate }: ProfileScreenProps) {
+export function ProfileScreen({ user, onBack, onUserUpdate, onLogout }: ProfileScreenProps) {
   const [newPin, setNewPin] = useState('')
   const [pinSuccess, setPinSuccess] = useState(false)
   const [showNeighborhoodChange, setShowNeighborhoodChange] = useState(false)

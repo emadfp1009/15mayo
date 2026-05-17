@@ -99,6 +99,13 @@ function App() {
                   ⚙️
                 </button>
               )}
+              <button
+                onClick={handleLogout}
+                className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                title="تسجيل خروج"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>
