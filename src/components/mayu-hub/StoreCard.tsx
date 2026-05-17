@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import type { StoreProfile } from '@/lib/mayu-hub/types'
+import { getCurrentUser, logActivity } from '@/lib/mayu-hub/auth'
 import { Phone, MessageCircle, Truck, Clock, MapPin } from 'lucide-react'
 
 interface StoreCardProps {
@@ -61,7 +62,11 @@ export function StoreCard({ store, status, categoryName, neighborhoodName, onCli
           <div className="flex items-center gap-2">
             <a
               href={`tel:${store.phone}`}
-              onClick={e => e.stopPropagation()}
+              onClick={e => {
+                e.stopPropagation()
+                const user = getCurrentUser()
+                if (user) logActivity({ userId: user.id, userName: user.name, action: 'call_store', targetId: store.id, targetName: store.nameAr })
+              }}
               className="btn-modern inline-flex items-center gap-1.5 text-xs gradient-primary text-white px-3 py-1.5"
             >
               <Phone className="w-3 h-3" />
@@ -72,7 +77,11 @@ export function StoreCard({ store, status, categoryName, neighborhoodName, onCli
                 href={`https://wa.me/${store.whatsappNumber.replace(/[+\s-]/g, '')}${store.whatsappMessage ? `?text=${encodeURIComponent(store.whatsappMessage)}` : ''}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  const user = getCurrentUser()
+                  if (user) logActivity({ userId: user.id, userName: user.name, action: 'whatsapp_store', targetId: store.id, targetName: store.nameAr })
+                }}
                 className="btn-modern inline-flex items-center gap-1.5 text-xs bg-green-500 text-white px-3 py-1.5"
               >
                 <MessageCircle className="w-3 h-3" />
