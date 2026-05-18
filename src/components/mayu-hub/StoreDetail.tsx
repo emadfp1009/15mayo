@@ -4,7 +4,8 @@ import { Separator } from '@/components/ui/separator'
 import type { StoreProfile, WorkingHours } from '@/lib/mayu-hub/types'
 import { computeStoreStatus } from '@/lib/mayu-hub/store-status'
 import { buildWhatsAppLink } from '@/lib/mayu-hub/validation'
-import { Phone, MessageCircle, Truck, Clock, MapPin, ArrowRight } from 'lucide-react'
+import { Phone, MessageCircle, MessageSquare, Truck, Clock, MapPin, ArrowRight } from 'lucide-react'
+import { StarRating } from '@/components/mayu-hub/StarRating'
 
 interface StoreDetailProps {
   store: StoreProfile
@@ -13,11 +14,12 @@ interface StoreDetailProps {
   categoryName?: string
   deliveryNeighborhoods?: string[]
   onBack: () => void
+  onMessage?: (storeId: string, storeName: string) => void
 }
 
 const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
-export function StoreDetail({ store, workingHours, neighborhoodName, categoryName, deliveryNeighborhoods, onBack }: StoreDetailProps) {
+export function StoreDetail({ store, workingHours, neighborhoodName, categoryName, deliveryNeighborhoods, onBack, onMessage }: StoreDetailProps) {
   const override = store.manualStatusOverride
     ? { status: store.manualStatusOverride as 'open' | 'closed', until: store.manualStatusOverrideUntil ? new Date(store.manualStatusOverrideUntil) : null }
     : null
@@ -65,6 +67,11 @@ export function StoreDetail({ store, workingHours, neighborhoodName, categoryNam
             <span className={`w-2 h-2 rounded-full ${status === 'open' ? 'bg-green-500' : 'bg-red-500'}`} />
             {status === 'open' ? 'مفتوح الآن' : 'مغلق'}
           </div>
+
+          {/* Star Rating - interactive */}
+          <div className="flex justify-center mt-2">
+            <StarRating storeId={store.id} size="md" />
+          </div>
         </div>
       </div>
 
@@ -87,6 +94,15 @@ export function StoreDetail({ store, workingHours, neighborhoodName, categoryNam
             <MessageCircle className="w-4 h-4" />
             واتساب
           </a>
+        )}
+        {onMessage && (
+          <button
+            onClick={() => onMessage(store.id, store.nameAr)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 border border-primary text-primary rounded-lg font-medium hover:bg-primary/10"
+          >
+            <MessageSquare className="w-4 h-4" />
+            مراسلة
+          </button>
         )}
       </div>
 

@@ -2,40 +2,25 @@ import { useState, useMemo } from 'react'
 import { StoreCard } from './StoreCard'
 import { SearchBar } from './SearchBar'
 import { BannerCarousel } from './BannerCarousel'
-import { CategoryScroller } from './CategoryScroller'
-import { computeNeighborhoodCircle } from '@/lib/mayu-hub/neighborhood-circle'
+import { ExploreFilter } from './ExploreFilter'
+import { applyExploreFilters } from '@/lib/mayu-hub/explore-filter'
 import { computeStoreStatus } from '@/lib/mayu-hub/store-status'
-import { filterStores, rankSearchResults, sortWithPremiumFirst } from '@/lib/mayu-hub/search'
+import { rankSearchResults, sortWithPremiumFirst } from '@/lib/mayu-hub/search'
 import { getActiveBanners } from '@/lib/mayu-hub/banner-rotation'
-import { demoNeighborhoods, demoAdjacencyMap, demoStores, demoCategories, demoBanners, demoWorkingHours } from '@/lib/mayu-hub/demo-data'
-import type { Neighborhood } from '@/lib/mayu-hub/types'
+import { demoNeighborhoods, demoCategories, demoBanners, demoWorkingHours } from '@/lib/mayu-hub/demo-data'
+import { realStores } from '@/lib/mayu-hub/real-data'
 
 interface ServicesViewProps {
-  primaryNeighborhoodId: string
-  onBack: () => void
+  primaryNeighborhoodId?: string
+  onBack?: () => void
   onStoreClick?: (storeId: string) => void
 }
 
 export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: ServicesViewProps) {
-  const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-
-  // Compute neighborhood circle
-  const activeSet = useMemo(
-    () => new Set(demoNeighborhoods.filter(n => n.isActive).map(n => n.id)),
-    []
-  )
-
-  const circleIds = useMemo(
-    () => computeNeighborhoodCircle(primaryNeighborhoodId, demoAdjacencyMap, activeSet),
-    [primaryNeighborhoodId, activeSet]
-  )
-
-  const circleNeighborhoods: Neighborhood[] = useMemo(
-    () => circleIds.map(id => demoNeighborhoods.find(n => n.id === id)!).filter(Boolean),
-    [circleIds]
-  )
+  const [deliveryOnly, setDeliveryOnly] = useState(false)
 
   // Get active banners - from localStorage (admin managed) or demo
   const activeBanners = useMemo(() => {
@@ -44,30 +29,29 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
     return getActiveBanners(bannerList, new Date())
   }, [])
 
-  // Filter and rank stores
+  // Filter stores using ExploreFilter logic
   const filteredStores = useMemo(() => {
-    const approvedStores = demoStores.filter(s => s.status === 'approved')
+    const approved = realStores.filter(s => s.status === 'approved')
 
-    // Apply filters
-    const filtered = filterStores(approvedStores, {
-      query: searchQuery,
-      circleNeighborhoodIds: circleIds,
+    // Apply explore filters (neighborhood, category, delivery)
+    const explored = applyExploreFilters(approved, {
+      neighborhoodId: selectedNeighborhood,
       categoryId: selectedCategory,
-      neighborhoodId: activeFilter,
+      deliveryOnly,
     })
 
-    // Rank by search if query exists
+    // If search query exists, rank by search relevance
     if (searchQuery.length >= 2) {
-      return rankSearchResults(filtered, searchQuery, primaryNeighborhoodId)
+      return rankSearchResults(explored, searchQuery, primaryNeighborhoodId ?? '')
     }
 
     // Sort with premium first
-    return sortWithPremiumFirst(filtered, new Date())
-  }, [searchQuery, selectedCategory, activeFilter, circleIds, primaryNeighborhoodId])
+    return sortWithPremiumFirst(explored, new Date())
+  }, [selectedNeighborhood, selectedCategory, deliveryOnly, searchQuery, primaryNeighborhoodId])
 
   // Get store status
   const getStoreStatus = (storeId: string): 'open' | 'closed' => {
-    const store = demoStores.find(s => s.id === storeId)
+    const store = realStores.find(s => s.id === storeId)
     if (!store) return 'closed'
 
     const hours = demoWorkingHours.filter(wh => wh.storeId === storeId)
@@ -78,28 +62,32 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
     return computeStoreStatus(hours, new Date(), override)
   }
 
-  const primaryNeighborhood = demoNeighborhoods.find(n => n.id === primaryNeighborhoodId)
+  const handleClearFilters = () => {
+    setSelectedNeighborhood(null)
+    setSelectedCategory(null)
+    setDeliveryOnly(false)
+  }
+
+  const primaryNeighborhood = primaryNeighborhoodId
+    ? demoNeighborhoods.find(n => n.id === primaryNeighborhoodId)
+    : null
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="text-sm text-primary hover:underline">
-          ← تغيير المجاورة
-        </button>
-        <span className="text-sm text-muted-foreground">
-          📍 {primaryNeighborhood?.nameAr}
-        </span>
-      </div>
+      {onBack && primaryNeighborhood && (
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="text-sm text-primary hover:underline">
+            ← تغيير المجاورة
+          </button>
+          <span className="text-sm text-muted-foreground">
+            📍 {primaryNeighborhood.nameAr}
+          </span>
+        </div>
+      )}
 
       {/* Banner carousel */}
       <BannerCarousel banners={activeBanners} onStoreClick={onStoreClick} />
-
-      {/* Categories - circular scrollable */}
-      <CategoryScroller
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
 
       {/* Search */}
       <SearchBar
@@ -110,32 +98,16 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
         onCategoryChange={setSelectedCategory}
       />
 
-      {/* Neighborhood circle filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setActiveFilter(null)}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-            activeFilter === null
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-muted-foreground hover:border-primary/50'
-          }`}
-        >
-          الكل
-        </button>
-        {circleNeighborhoods.map(n => (
-          <button
-            key={n.id}
-            onClick={() => setActiveFilter(n.id === activeFilter ? null : n.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              activeFilter === n.id
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border text-muted-foreground hover:border-primary/50'
-            }`}
-          >
-            {n.nameAr}
-          </button>
-        ))}
-      </div>
+      {/* Explore Filter (replaces old neighborhood circle chips) */}
+      <ExploreFilter
+        selectedNeighborhood={selectedNeighborhood}
+        selectedCategory={selectedCategory}
+        deliveryOnly={deliveryOnly}
+        onNeighborhoodChange={setSelectedNeighborhood}
+        onCategoryChange={setSelectedCategory}
+        onDeliveryToggle={setDeliveryOnly}
+        onClear={handleClearFilters}
+      />
 
       {/* Results */}
       <div className="space-y-3">
@@ -143,7 +115,7 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
           <div className="text-center py-8">
             <p className="text-muted-foreground">لا توجد نتائج</p>
             <p className="text-sm text-muted-foreground mt-1">
-              جرب إزالة الفلاتر أو البحث في مجاورات أخرى
+              جرب إزالة الفلاتر أو البحث بكلمات أخرى
             </p>
           </div>
         ) : (

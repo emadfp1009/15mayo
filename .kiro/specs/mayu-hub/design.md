@@ -1,631 +1,547 @@
-# وثيقة التصميم: مايو هب
+# Design Document: Mayu Hub Upgrade
 
 ## Overview
 
-مايو هب هو دليل خدمات محلي مبني على أساس جغرافي لمدينة 15 مايو، يربط السكان بالخدمات التجارية والمجتمعية القريبة منهم. يُنمذج النظام المدينة كرسم بياني (Graph) من 36 مجاورة سكنية مع علاقات تجاور، مما يتيح حساب "دائرة المجاورة" التي تعرض الخدمات ذات الصلة لكل مقيم.
+This design covers the comprehensive upgrade of Mayu Hub — a neighborhood services directory PWA for 15 May City, Egypt. The upgrade introduces phone/OTP login, explore filters, banner carousel, star ratings, favorites, a buy-and-sell marketplace, in-app messaging, store owner dashboard, side navigation drawer, social media links, and an enhanced admin panel — all powered by localStorage for data persistence and the real 30-store dataset.
 
-يخدم التطبيق ثلاثة أدوار:
-- **المقيمون** — تصفح والبحث والتواصل مع الخدمات المحلية
-- **مقدمو الخدمات** — تسجيل وإدارة ملفات المتاجر
-- **المسؤولون** — إدارة المجاورات، الموافقة على المتاجر، إعداد الإعلانات
+**Key Technical Decisions:**
 
-القرارات التقنية الرئيسية:
-- **Supabase** كخلفية (مصادقة، قاعدة بيانات، تخزين ملفات، بيانات فورية)
-- **نموذج تجاور قائم على الرسم البياني** لدوائر المجاورة (مخزن كجدول ربط)
-- **مؤشرات الحالة المحسوبة** باستخدام مقارنة ساعات العمل + المنطقة الزمنية
-- **إطلاق تدريجي** عبر علامة `is_active` على المجاورات تتحكم في جميع الاستعلامات
+| Decision | Rationale |
+|----------|-----------|
+| React 19 + Vite 8 + TypeScript 6 + Tailwind CSS 4 | Already configured in the project |
+| localStorage for all new data (ratings, favorites, messages, marketplace) | No backend needed; offline-first PWA; simple persistence |
+| embla-carousel-react for banner carousel | Already installed; lightweight, touch-friendly |
+| shadcn/ui Sheet for side drawer | Already available; accessible, animated |
+| Custom hooks for state management (useState/useEffect) | Lightweight; no extra dependencies needed |
+| real-data.ts as primary data source | Replaces demo-data.ts; 30 real stores for 15 May City |
+| RTL Arabic-first interface | Target audience is Arabic-speaking residents |
+| Mobile-first PWA | Primary usage on mobile devices |
 
 ## Architecture
 
 ```mermaid
 graph TB
-    subgraph Client["تطبيق React SPA (Vite + TanStack Router)"]
-        Pages[صفحات المسارات]
-        Components[مكونات واجهة المستخدم]
-        Hooks[Custom Hooks]
-        Lib[وحدات المنطق البحت]
+    subgraph Client["React SPA (Vite + PWA)"]
+        App[App.tsx - Router & Layout]
+        Views[View Components]
+        UI[shadcn/ui Components]
+        Hooks[Custom Hooks - src/hooks/mayu-hub/]
+        Lib[Pure Logic - src/lib/mayu-hub/]
+        Storage[localStorage Persistence]
     end
 
-    subgraph Supabase["خلفية Supabase"]
-        Auth[خدمة المصادقة]
-        DB[(PostgreSQL)]
-        Storage[تخزين الملفات]
-        RLS[أمان مستوى الصف]
-        Edge[Edge Functions]
-    end
-
-    Pages --> Hooks
+    App --> Views
+    Views --> UI
+    Views --> Hooks
     Hooks --> Lib
-    Hooks -->|@supabase/supabase-js| Auth
-    Hooks -->|@supabase/supabase-js| DB
-    Components --> Hooks
-    Lib -->|حسابات بحتة| Lib
-    Pages -->|رفع ملفات| Storage
-    DB --> RLS
-    Edge -->|مجدول| DB
+    Hooks --> Storage
+    Lib -->|Pure computations| Lib
 ```
 
-### قرارات معمارية
+### Component Architecture
 
-| القرار | المبرر |
-|--------|--------|
-| تخزين التجاور في جدول ربط بقاعدة البيانات | يسمح بالتعديل من لوحة الإدارة بدون نشر كود جديد؛ يدعم الإطلاق التدريجي |
-| حساب الحالة من جانب العميل مع احتياطي من الخادم | يقلل حمل الخادم؛ Edge Function تحدث الحالة للإشعارات |
-| البحث محدود بدائرة المجاورة افتراضياً | متطلب أساسي لتجربة المستخدم؛ دالة Supabase RPC تتعامل مع الربط بكفاءة |
-| واجهة عربية أولاً مع تخطيط RTL | الجمهور المستهدف ناطق بالعربية من سكان مدينة 15 مايو |
-| ترتيب المميز عبر `is_premium` + `premium_started_at` | ترتيب بسيط: المميز أولاً (حسب تاريخ البدء)، ثم غير المميز (حسب الاسم) |
+```mermaid
+graph TB
+    App[App.tsx]
+    App --> LoginScreen
+    App --> SideDrawer
+    App --> MainContent
+
+    MainContent --> ServicesView
+    MainContent --> FavoritesView
+    MainContent --> MarketplaceView
+    MainContent --> ChatView
+    MainContent --> StoreDashboard
+    MainContent --> StoreDetail
+    MainContent --> AdminPanel
+
+    ServicesView --> BannerCarousel
+    ServicesView --> ExploreFilter
+    ServicesView --> StoreCard
+
+    StoreCard --> StarRating
+    StoreCard --> FavoriteButton
+
+    StoreDetail --> StarRating
+    StoreDetail --> SocialLinks
+
+    MarketplaceView --> MarketplaceForm
+
+    ChatView --> ChatThread
+```
+
+### Navigation Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> LoginScreen
+    LoginScreen --> ServicesView: Login/Guest
+    ServicesView --> StoreDetail: Tap store
+    ServicesView --> FavoritesView: Side drawer
+    ServicesView --> MarketplaceView: Side drawer
+    ServicesView --> ChatView: Side drawer
+    ServicesView --> StoreDashboard: Side drawer
+    ServicesView --> AdminPanel: Side drawer (admin only)
+    StoreDetail --> ChatThread: Message button
+```
 
 ## Components and Interfaces
 
-### هيكل المسارات
-
-```
-/                          → صفحة الهبوط / اختيار المجاورة (إذا لم تُحدد)
-/hub                       → عرض الخدمات الرئيسي (دائرة المجاورة)
-/hub/store/:id             → تفاصيل ملف المتجر
-/hub/community             → دليل الخدمات المجتمعية
-/hub/search                → نتائج البحث
-/admin/hub                 → لوحة الإدارة (متاجر، مجاورات، إعلانات)
-/admin/hub/approvals       → قائمة انتظار الموافقات
-/admin/hub/neighborhoods   → إدارة المجاورات
-/admin/hub/banners         → إدارة الإعلانات البانر
-```
-
-### المكونات الأساسية
+### New Components
 
 ```typescript
-// اختيار المجاورة
-interface NeighborhoodSelectorProps {
-  neighborhoods: Neighborhood[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  disabled?: boolean;
+// src/components/mayu-hub/LoginScreen.tsx
+interface LoginScreenProps {
+  onComplete: (user: UserProfile) => void;
 }
 
-// عرض الخدمات مع تصفية الدائرة
-interface ServicesViewProps {
-  circleNeighborhoods: Neighborhood[];
-  activeFilter: string | null; // معرف المجاورة أو null لـ "الكل"
-  onFilterChange: (id: string | null) => void;
+// src/components/mayu-hub/SideDrawer.tsx
+interface SideDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: UserProfile;
+  onNavigate: (view: View) => void;
+  onLogout: () => void;
 }
 
-// بطاقة المتجر في القائمة
+// src/components/mayu-hub/ExploreFilter.tsx
+interface ExploreFilterProps {
+  selectedNeighborhood: string | null;
+  selectedCategory: string | null;
+  deliveryOnly: boolean;
+  onNeighborhoodChange: (id: string | null) => void;
+  onCategoryChange: (id: string | null) => void;
+  onDeliveryToggle: (value: boolean) => void;
+  onClear: () => void;
+}
+
+// src/components/mayu-hub/StarRating.tsx
+interface StarRatingProps {
+  storeId: string;
+  readonly?: boolean;       // display-only mode for cards
+  size?: 'sm' | 'md';
+}
+
+// src/components/mayu-hub/FavoriteButton.tsx
+interface FavoriteButtonProps {
+  storeId: string;
+  showCount?: boolean;
+}
+
+// src/components/mayu-hub/MarketplaceView.tsx
+interface MarketplaceViewProps {
+  onBack: () => void;
+}
+
+// src/components/mayu-hub/MarketplaceForm.tsx
+interface MarketplaceFormProps {
+  onSubmit: (ad: ClassifiedAdInput) => void;
+  onCancel: () => void;
+}
+
+// src/components/mayu-hub/ChatView.tsx
+interface ChatViewProps {
+  onBack: () => void;
+  onOpenThread: (threadId: string) => void;
+}
+
+// src/components/mayu-hub/ChatThread.tsx
+interface ChatThreadProps {
+  storeId: string;
+  storeName: string;
+  onBack: () => void;
+}
+
+// src/components/mayu-hub/StoreDashboard.tsx
+interface StoreDashboardProps {
+  onBack: () => void;
+}
+
+// src/components/mayu-hub/SocialLinks.tsx
+interface SocialLinksProps {
+  facebook?: string;
+  instagram?: string;
+  whatsapp?: string;
+}
+```
+
+### Modified Components
+
+```typescript
+// App.tsx - Add side drawer, new views, remove NeighborhoodModal
+type View = 'login' | 'services' | 'store-detail' | 'favorites' |
+            'marketplace' | 'messages' | 'chat-thread' | 'my-store' |
+            'admin' | 'register-store' | 'profile' | 'community' | 'emergency'
+
+// StoreCard.tsx - Add rating display and heart button
 interface StoreCardProps {
   store: StoreProfile;
-  isPremium: boolean;
-  statusIndicator: 'open' | 'closed';
+  status: 'open' | 'closed';
+  categoryName?: string;
+  neighborhoodName?: string;
+  onClick?: () => void;
+  // NEW:
+  averageRating: number;
+  totalRatings: number;
+  isFavorited: boolean;
+  favoritesCount: number;
 }
 
-// صفحة تفاصيل المتجر
+// StoreDetail.tsx - Add rating input, message button, social links
 interface StoreDetailProps {
   store: StoreProfile;
   workingHours: WorkingHours[];
-  deliveryInfo: DeliveryInfo | null;
-  specialOffers: SpecialOffer[];
+  neighborhoodName: string;
+  categoryName?: string;
+  deliveryNeighborhoods?: string[];
+  onBack: () => void;
+  // NEW:
+  onMessage: (storeId: string) => void;
 }
 
-// دوّار الإعلانات البانر
-interface BannerCarouselProps {
-  banners: BannerAd[];
-  rotationIntervalMs: number; // 5000
-}
+// ServicesView.tsx - Use real-data, add ExploreFilter, BannerCarousel
+// Replace demo-data imports with real-data imports
+// Add ExploreFilter dropdown above store listings
 
-// دليل الخدمات المجتمعية
-interface CommunityDirectoryProps {
-  services: CommunityService[];
-  neighborhoodFilter: string | null;
-  typeFilter: CommunityServiceType | null;
-}
-
-// محرك البحث
-interface SearchBarProps {
-  query: string;
-  onQueryChange: (q: string) => void;
-  categoryFilter: string | null;
-  neighborhoodFilter: string | null;
-  onCategoryChange: (cat: string | null) => void;
-  onNeighborhoodChange: (id: string | null) => void;
-}
+// AdminPanel - Add new tabs: users, analytics, banners, marketplace moderation
 ```
 
-### الـ Hooks المخصصة
+### Custom Hooks
 
 ```typescript
-// حساب دائرة المجاورة
-function useNeighborhoodCircle(primaryNeighborhoodId: string | null): {
-  circle: Neighborhood[];
-  isLoading: boolean;
+// src/hooks/mayu-hub/useRatings.ts
+function useRatings(storeId: string): {
+  averageRating: number;
+  totalRatings: number;
+  userRating: number | null;
+  submitRating: (rating: number) => void;
 }
 
-// حساب حالة المتجر
-function useStoreStatus(workingHours: WorkingHours[], manualOverride: StoreStatusOverride | null): {
-  status: 'open' | 'closed';
-  nextTransition: Date | null;
+// src/hooks/mayu-hub/useFavorites.ts
+function useFavorites(): {
+  favorites: string[];
+  isFavorited: (storeId: string) => boolean;
+  toggleFavorite: (storeId: string) => void;
+  getFavoritesCount: (storeId: string) => number;
 }
 
-// البحث مع فلاتر مجمعة
-function useServiceSearch(params: {
-  query: string;
-  circleIds: string[];
-  categoryId: string | null;
-  neighborhoodId: string | null;
-}): {
-  results: StoreProfile[];
-  isLoading: boolean;
-  isEmpty: boolean;
+// src/hooks/mayu-hub/useMarketplace.ts
+function useMarketplace(): {
+  ads: ClassifiedAd[];
+  addAd: (ad: ClassifiedAdInput) => void;
+  removeAd: (adId: string) => void;
+  filterByCategory: (category: string | null) => ClassifiedAd[];
 }
 
-// إعلانات البانر
-function useActiveBanners(): {
-  banners: BannerAd[];
-  hasActiveBanners: boolean;
+// src/hooks/mayu-hub/useMessaging.ts
+function useMessaging(): {
+  threads: ChatThread[];
+  getThread: (storeId: string) => ChatThread | null;
+  sendMessage: (storeId: string, text: string) => void;
+  getUnreadCount: () => number;
 }
 
-// قائمة انتظار الموافقات
-function useApprovalQueue(): {
-  pending: PendingStore[];
-  approve: (id: string) => Promise<void>;
-  reject: (id: string, reason: string) => Promise<void>;
+// src/hooks/mayu-hub/useStoreViews.ts
+function useStoreViews(storeId: string): {
+  viewCount: number;
+  incrementView: () => void;
 }
-```
-
-### وحدات المنطق البحت (`src/lib/mayu-hub/`)
-
-```typescript
-// src/lib/mayu-hub/neighborhood-circle.ts
-export function computeNeighborhoodCircle(
-  primaryId: string,
-  adjacencyMap: Map<string, string[]>,
-  activeNeighborhoods: Set<string>
-): string[];
-
-// src/lib/mayu-hub/store-status.ts
-export function computeStoreStatus(
-  workingHours: WorkingHours[],
-  currentTime: Date,
-  manualOverride: StoreStatusOverride | null
-): 'open' | 'closed';
-
-// src/lib/mayu-hub/search.ts
-export function rankSearchResults(
-  stores: StoreProfile[],
-  query: string,
-  primaryNeighborhoodId: string
-): StoreProfile[];
-
-export function filterStores(
-  stores: StoreProfile[],
-  filters: SearchFilters
-): StoreProfile[];
-
-// src/lib/mayu-hub/banner-rotation.ts
-export function getActiveBanners(
-  banners: BannerAd[],
-  currentDate: Date
-): BannerAd[];
-
-// src/lib/mayu-hub/validation.ts
-export function validateStoreProfile(input: StoreProfileInput): ValidationResult;
-export function validateWhatsAppMessage(message: string): boolean;
 ```
 
 ## Data Models
 
-### جداول Supabase
-
-```sql
--- المجاورات مع دعم التجاور
-CREATE TABLE neighborhoods (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name_ar TEXT NOT NULL,           -- الاسم بالعربي (مثل "المجاورة الأولى")
-  number INTEGER NOT NULL UNIQUE CHECK (number BETWEEN 1 AND 36),
-  is_active BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- علاقات التجاور (ثنائية الاتجاه)
-CREATE TABLE neighborhood_adjacency (
-  neighborhood_id UUID NOT NULL REFERENCES neighborhoods(id),
-  adjacent_id UUID NOT NULL REFERENCES neighborhoods(id),
-  PRIMARY KEY (neighborhood_id, adjacent_id),
-  CHECK (neighborhood_id <> adjacent_id)
-);
-
--- ملفات المتاجر
-CREATE TABLE store_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id UUID NOT NULL REFERENCES auth.users(id),
-  neighborhood_id UUID NOT NULL REFERENCES neighborhoods(id),
-  name_ar TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  whatsapp_number TEXT,
-  whatsapp_message TEXT CHECK (char_length(whatsapp_message) <= 256),
-  logo_url TEXT,
-  storefront_photo_url TEXT,
-  category_id UUID REFERENCES service_categories(id),
-  is_premium BOOLEAN NOT NULL DEFAULT false,
-  premium_started_at TIMESTAMPTZ,
-  premium_expires_at TIMESTAMPTZ,
-  status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'approved', 'rejected', 'deactivated')),
-  rejection_reason TEXT,
-  delivers BOOLEAN NOT NULL DEFAULT false,
-  delivery_cost_egp NUMERIC(10,2),
-  delivery_duration_minutes INTEGER,
-  manual_status_override TEXT CHECK (manual_status_override IN ('open', 'closed')),
-  manual_status_override_until TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-```sql
--- ساعات العمل لكل يوم
-CREATE TABLE store_working_hours (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID NOT NULL REFERENCES store_profiles(id) ON DELETE CASCADE,
-  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=الأحد
-  open_time TIME NOT NULL,
-  close_time TIME NOT NULL,
-  is_closed BOOLEAN NOT NULL DEFAULT false,
-  UNIQUE (store_id, day_of_week)
-);
-
--- مجاورات التوصيل (علاقة متعدد لمتعدد)
-CREATE TABLE store_delivery_neighborhoods (
-  store_id UUID NOT NULL REFERENCES store_profiles(id) ON DELETE CASCADE,
-  neighborhood_id UUID NOT NULL REFERENCES neighborhoods(id),
-  PRIMARY KEY (store_id, neighborhood_id)
-);
-
--- فئات الخدمات
-CREATE TABLE service_categories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name_ar TEXT NOT NULL,
-  icon TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  is_active BOOLEAN NOT NULL DEFAULT true
-);
-
--- العروض الخاصة (للمميزين فقط)
-CREATE TABLE special_offers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID NOT NULL REFERENCES store_profiles(id) ON DELETE CASCADE,
-  title_ar TEXT NOT NULL,
-  description_ar TEXT,
-  image_url TEXT,
-  starts_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at TIMESTAMPTZ NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (expires_at > starts_at),
-  CHECK (expires_at <= starts_at + INTERVAL '30 days')
-);
-
--- إعلانات البانر
-CREATE TABLE banner_ads (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url TEXT NOT NULL,
-  target_type TEXT NOT NULL CHECK (target_type IN ('store', 'external')),
-  target_store_id UUID REFERENCES store_profiles(id),
-  target_url TEXT,
-  starts_at DATE NOT NULL,
-  ends_at DATE NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (ends_at >= starts_at)
-);
-
--- الخدمات المجتمعية/الحكومية (دليل ثابت)
-CREATE TABLE community_services (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  neighborhood_id UUID NOT NULL REFERENCES neighborhoods(id),
-  name_ar TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN (
-    'school', 'post_office', 'youth_center', 'mosque', 'church',
-    'hospital', 'police_station', 'civil_registry', 'gas_office', 'electricity_office'
-  )),
-  school_type TEXT CHECK (school_type IN ('government', 'experimental', 'private')),
-  address TEXT,
-  phone TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- ملفات المقيمين (امتداد لـ auth.users)
-CREATE TABLE resident_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  primary_neighborhood_id UUID REFERENCES neighborhoods(id),
-  display_name TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-### أنواع TypeScript
+### New TypeScript Types
 
 ```typescript
-interface Neighborhood {
-  id: string;
-  nameAr: string;
-  number: number;
-  isActive: boolean;
+// Additions to src/lib/mayu-hub/types.ts
+
+// === Ratings ===
+interface StoreRatings {
+  [storeId: string]: {
+    [userId: string]: number; // 1-5
+  };
 }
 
-interface StoreProfile {
+// === Favorites ===
+interface UserFavorites {
+  [userId: string]: string[]; // array of storeId
+}
+
+// === Marketplace ===
+interface ClassifiedAd {
   id: string;
-  ownerId: string;
-  neighborhoodId: string;
-  nameAr: string;
+  userId: string;
+  userName: string;
+  title: string;
+  description: string;
+  price: number;
+  photoUrl: string | null;  // base64 data URL or null
   phone: string;
-  whatsappNumber: string | null;
-  whatsappMessage: string | null;
-  logoUrl: string | null;
-  storefrontPhotoUrl: string | null;
-  categoryId: string | null;
-  isPremium: boolean;
-  premiumStartedAt: string | null;
-  premiumExpiresAt: string | null;
-  status: 'pending' | 'approved' | 'rejected' | 'deactivated';
-  rejectionReason: string | null;
-  delivers: boolean;
-  deliveryCostEgp: number | null;
-  deliveryDurationMinutes: number | null;
-  manualStatusOverride: 'open' | 'closed' | null;
-  manualStatusOverrideUntil: string | null;
+  category: MarketplaceCategory;
   createdAt: string;
-  updatedAt: string;
-}
-
-interface WorkingHours {
-  id: string;
-  storeId: string;
-  dayOfWeek: number; // 0-6
-  openTime: string;  // "HH:mm"
-  closeTime: string; // "HH:mm"
-  isClosed: boolean;
-}
-
-interface StoreStatusOverride {
-  status: 'open' | 'closed';
-  until: Date | null;
-}
-
-interface SearchFilters {
-  query: string;
-  circleNeighborhoodIds: string[];
-  categoryId: string | null;
-  neighborhoodId: string | null;
-}
-
-interface BannerAd {
-  id: string;
-  imageUrl: string;
-  targetType: 'store' | 'external';
-  targetStoreId: string | null;
-  targetUrl: string | null;
-  startsAt: string;
-  endsAt: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface CommunityService {
-  id: string;
-  neighborhoodId: string;
-  nameAr: string;
-  type: CommunityServiceType;
-  schoolType: 'government' | 'experimental' | 'private' | null;
-  address: string | null;
-  phone: string | null;
-}
-
-type CommunityServiceType =
-  | 'school' | 'post_office' | 'youth_center' | 'mosque' | 'church'
-  | 'hospital' | 'police_station' | 'civil_registry' | 'gas_office'
-  | 'electricity_office';
-
-interface SpecialOffer {
-  id: string;
-  storeId: string;
-  titleAr: string;
-  descriptionAr: string | null;
-  imageUrl: string | null;
-  startsAt: string;
-  expiresAt: string;
   isActive: boolean;
 }
 
-interface StoreProfileInput {
-  nameAr: string;
+type MarketplaceCategory =
+  | 'electronics' | 'furniture' | 'vehicles' | 'clothing'
+  | 'home_appliances' | 'sports' | 'books' | 'other';
+
+interface ClassifiedAdInput {
+  title: string;
+  description: string;
+  price: number;
+  photoUrl: string | null;
   phone: string;
-  neighborhoodId: string;
-  workingHours: WorkingHoursInput[];
-  whatsappNumber?: string;
-  whatsappMessage?: string;
-  logoFile?: File;
-  storefrontPhotoFile?: File;
-  categoryId?: string;
-  delivers?: boolean;
-  deliveryCostEgp?: number;
-  deliveryDurationMinutes?: number;
-  deliveryNeighborhoodIds?: string[];
+  category: MarketplaceCategory;
 }
 
-interface ValidationResult {
-  valid: boolean;
-  errors: Record<string, string>;
+// === Messaging ===
+interface ChatMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
+interface ChatThread {
+  id: string;           // format: `${userId}_${storeId}`
+  userId: string;
+  storeId: string;
+  storeName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+// === Store Views ===
+interface StoreViews {
+  [storeId: string]: number;
+}
+
+// === Social Links (extension to StoreProfile) ===
+interface StoreSocialLinks {
+  facebook?: string;
+  instagram?: string;
+  whatsapp?: string;
+}
+
+// === Guest User ===
+interface GuestSession {
+  id: string;       // 'guest-{timestamp}'
+  isGuest: true;
+  createdAt: string;
 }
 ```
+
+### localStorage Keys
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `mayu_hub_ratings` | `StoreRatings` | All store ratings keyed by storeId then userId |
+| `mayu_hub_favorites` | `UserFavorites` | User favorites keyed by userId |
+| `mayu_hub_marketplace` | `ClassifiedAd[]` | All marketplace ads |
+| `mayu_hub_messages` | `{ [threadId]: ChatMessage[] }` | All chat messages |
+| `mayu_hub_threads` | `ChatThread[]` | Chat thread metadata |
+| `mayu_hub_store_views` | `StoreViews` | View counts per store |
+| `mayu_hub_store_social` | `{ [storeId]: StoreSocialLinks }` | Social links per store |
+| `mayu_hub_users` | `UserProfile[]` | Registered users (existing) |
+| `mayu_hub_current_user` | `UserProfile` | Current session (existing) |
+| `mayu_hub_banners` | `BannerAd[]` | Admin-managed banners (existing) |
+
+### Rating Computation (Pure Function)
+
+```typescript
+// src/lib/mayu-hub/ratings.ts
+export function computeAverageRating(ratings: Record<string, number>): {
+  average: number;  // rounded to 1 decimal
+  total: number;
+} {
+  const values = Object.values(ratings);
+  if (values.length === 0) return { average: 0, total: 0 };
+  const sum = values.reduce((a, b) => a + b, 0);
+  return {
+    average: Math.round((sum / values.length) * 10) / 10,
+    total: values.length,
+  };
+}
+```
+
+### Filter Logic (Pure Function)
+
+```typescript
+// src/lib/mayu-hub/explore-filter.ts
+export function applyExploreFilters(
+  stores: StoreProfile[],
+  filters: {
+    neighborhoodId: string | null;
+    categoryId: string | null;
+    deliveryOnly: boolean;
+  }
+): StoreProfile[] {
+  return stores.filter(store => {
+    if (filters.neighborhoodId && store.neighborhoodId !== filters.neighborhoodId) return false;
+    if (filters.categoryId && store.categoryId !== filters.categoryId) return false;
+    if (filters.deliveryOnly && !store.delivers) return false;
+    return true;
+  });
+}
+```
+
+### Marketplace Validation (Pure Function)
+
+```typescript
+// src/lib/mayu-hub/marketplace.ts
+export function validateClassifiedAd(input: ClassifiedAdInput): ValidationResult {
+  const errors: Record<string, string> = {};
+  if (!input.title || input.title.trim().length === 0) {
+    errors.title = 'العنوان مطلوب';
+  }
+  if (!input.price || input.price <= 0) {
+    errors.price = 'السعر مطلوب ويجب أن يكون أكبر من صفر';
+  }
+  if (!input.phone || input.phone.trim().length === 0) {
+    errors.phone = 'رقم الهاتف مطلوب';
+  }
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+```
+
+
 
 ## Correctness Properties
 
-*الخاصية هي سلوك أو صفة يجب أن تظل صحيحة عبر جميع عمليات التنفيذ الصالحة للنظام — بمعنى آخر، هي تصريح رسمي حول ما يجب أن يفعله النظام. تعمل الخصائص كجسر بين المواصفات المقروءة بشرياً وضمانات الصحة القابلة للتحقق آلياً.*
+*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-### Property 1: حساب دائرة المجاورة يحترم التجاور والحالة النشطة
+### Property 1: Guest mode restricts all write operations
 
-*لأي* خريطة تجاور صالحة ولأي مجاورة أساسية نشطة، يجب أن تحتوي دائرة المجاورة المحسوبة على المجاورة الأساسية بالضبط بالإضافة إلى جميع المجاورات المتاخمة المُعلَّمة كنشطة، ويجب ألا تحتوي أبداً على مجاورات غير نشطة أو مجاورات غير متاخمة.
+*For any* write operation (rating, favoriting, messaging, posting ads) attempted by a guest user, the system SHALL block the operation and return a login prompt indicator, leaving the underlying data unchanged.
 
-**Validates: Requirements 2.2, 10.2, 10.4**
+**Validates: Requirements 1.6**
 
-### Property 2: نتائج البحث مرتبة بالتطابق التام أولاً ثم الجزئي، بحد أقصى 20
+### Property 2: Explore filters use AND logic
 
-*لأي* استعلام بحث غير فارغ (≥ حرفين) ولأي مجموعة متاجر ضمن دائرة المجاورة، يجب أن تضع النتائج المُرجعة المتاجر التي يتطابق اسمها تماماً مع الاستعلام قبل المتاجر ذات التطابق الجزئي فقط، ويجب ألا يتجاوز إجمالي النتائج 20.
+*For any* set of stores and *for any* combination of active filters (neighborhood, category, delivery), every store in the filtered results SHALL satisfy all active filter criteria simultaneously, and no store satisfying all active criteria SHALL be excluded from the results.
 
-**Validates: Requirements 3.1, 2.1**
+**Validates: Requirements 3.3, 3.4, 3.5, 3.6**
 
-### Property 3: الفلاتر المجمعة تستخدم منطق AND
+### Property 3: Rating average computation
 
-*لأي* مجموعة متاجر ولأي تركيبة من الفلاتر النشطة (استعلام نصي، فئة، مجاورة)، يجب أن يستوفي كل متجر في النتائج المُصفاة جميع الفلاتر النشطة في آن واحد، ولا يجب استبعاد أي متجر يستوفي جميع الفلاتر من النتائج.
+*For any* non-empty set of integer ratings (each between 1 and 5), the computed average SHALL equal the arithmetic mean rounded to one decimal place. For an empty set of ratings, the average SHALL be 0.
 
-**Validates: Requirements 3.5, 3.2, 3.3, 2.4**
+**Validates: Requirements 5.3, 5.5**
 
-### Property 4: بناء رابط واتساب والتحقق من الرسالة
+### Property 4: Favorite toggle is its own inverse
 
-*لأي* رقم هاتف صالح ونص رسالة، يجب أن يحتوي رابط واتساب المُنشأ على رقم الهاتف بالتنسيق الصحيح. بالإضافة إلى ذلك، *لأي* نص رسالة يتجاوز 256 حرفاً، يجب أن يرفضه التحقق.
+*For any* user and *for any* store, toggling the favorite state twice SHALL return the favorites list to its original state (adding then removing, or removing then adding).
 
-**Validates: Requirements 4.3**
+**Validates: Requirements 6.2**
 
-### Property 5: التحقق من ملف المتجر يفرض الحقول المطلوبة
+### Property 5: Favorites view shows exactly favorited stores
 
-*لأي* مدخل ملف متجر، إذا كان أي من الحقول الإلزامية (الاسم، الهاتف، المجاورة، ساعات العمل) مفقوداً أو فارغاً، يجب أن يُرجع التحقق "غير صالح" مع خطأ لذلك الحقل. إذا كانت جميع الحقول الإلزامية موجودة وصالحة، يجب أن يُرجع التحقق "صالح".
+*For any* user with a set of favorited store IDs, the favorites view SHALL display exactly those stores and no others.
 
-**Validates: Requirements 4.7**
+**Validates: Requirements 6.5**
 
-### Property 6: حساب حالة المتجر مع أولوية التجاوز اليدوي
+### Property 6: Favorites persistence round-trip
 
-*لأي* مجموعة ساعات عمل، ولأي وقت حالي، ولأي حالة تجاوز يدوي: إذا كان التجاوز اليدوي نشطاً (لم تنتهِ صلاحيته)، يجب أن تساوي الحالة المحسوبة قيمة التجاوز بغض النظر عن ساعات العمل. إذا لم يكن هناك تجاوز نشط، يجب أن تكون الحالة "مفتوح" إذا كان الوقت الحالي يقع ضمن ساعات العمل لليوم الحالي، و"مغلق" خلاف ذلك. إذا لم تُهيَّأ ساعات عمل، يجب أن تكون الحالة "مغلق".
+*For any* user ID and *for any* set of store IDs marked as favorites, persisting to localStorage and reading back SHALL produce an equivalent set.
 
-**Validates: Requirements 5.2, 5.3, 5.5**
+**Validates: Requirements 6.6**
 
-### Property 7: عرض الخدمة المجتمعية يحذف الحقول الفارغة
+### Property 7: Marketplace ad persistence round-trip
 
-*لأي* سجل خدمة مجتمعية بأي تركيبة من الحقول الاختيارية الفارغة وغير الفارغة (العنوان، الهاتف)، يجب أن يتضمن المخرج المعروض فقط الحقول ذات القيم غير الفارغة، ويجب أن يتضمن دائماً اسم الخدمة والمجاورة.
+*For any* valid ClassifiedAd, adding it to the marketplace and reading back the marketplace list SHALL contain an equivalent ad entry.
 
-**Validates: Requirements 6.3**
+**Validates: Requirements 7.3, 7.5**
 
-### Property 8: التصفية المجمعة للخدمات المجتمعية
+### Property 8: Marketplace category filter
 
-*لأي* مجموعة خدمات مجتمعية ولأي تركيبة من فلتر المجاورة وفلتر النوع، يجب أن تتطابق كل خدمة في النتائج المُصفاة مع كل من المجاورة المحددة (إن وُجدت) والنوع المحدد (إن وُجد)، ولا يجب استبعاد أي خدمة تتطابق مع جميع الفلاتر النشطة.
+*For any* marketplace category and *for any* set of classified ads, filtering by that category SHALL return only ads with a matching category, and no matching ad SHALL be excluded.
 
-**Validates: Requirements 6.5, 6.6, 6.8**
+**Validates: Requirements 7.4**
 
-### Property 9: المتاجر المميزة تُرتب قبل غير المميزة
+### Property 9: Marketplace validation rejects invalid ads
 
-*لأي* قائمة متاجر معتمدة بحالات مميزة وغير مميزة مختلطة، بعد الترتيب، يجب أن يظهر كل متجر مميز قبل كل متجر غير مميز. بين المتاجر المميزة، تظهر أولاً تلك ذات تواريخ `premium_started_at` الأقدم.
+*For any* ClassifiedAdInput where the title is empty/whitespace-only OR the price is zero/negative, the validation function SHALL return invalid with appropriate error keys. *For any* ClassifiedAdInput with a non-empty title AND positive price AND non-empty phone, validation SHALL return valid.
 
-**Validates: Requirements 7.2**
+**Validates: Requirements 7.7**
 
-### Property 10: قيود العروض المميزة
+### Property 10: Messages displayed in chronological order
 
-*لأي* متجر مميز، يجب ألا يسمح النظام بأكثر من 5 عروض خاصة نشطة في وقت واحد. *لأي* عرض خاص، يجب ألا تتجاوز مدته (expires_at - starts_at) 30 يوماً.
+*For any* set of chat messages in a thread with distinct timestamps, the displayed order SHALL be sorted ascending by timestamp (oldest first).
 
-**Validates: Requirements 7.3**
+**Validates: Requirements 8.3**
 
-### Property 11: انتهاء الاشتراك المميز يُعيد للمستوى الأساسي
+### Property 11: Message persistence round-trip
 
-*لأي* متجر تاريخ `premium_expires_at` الخاص به في الماضي بالنسبة للوقت الحالي، يجب معاملة المتجر كغير مميز في الترتيب ويجب ألا تكون عروضه الخاصة مرئية للمقيمين.
+*For any* chat thread and *for any* sequence of messages sent to that thread, persisting to localStorage and reading back SHALL produce the same messages in the same order.
 
-**Validates: Requirements 7.5**
-
-### Property 12: تصفية البانرات النشطة حسب التاريخ مع حد أقصى
-
-*لأي* مجموعة إعلانات بانر ولأي تاريخ حالي، يجب أن تُرجع دالة `getActiveBanners` فقط البانرات التي يشمل نطاق تاريخها التاريخ الحالي (starts_at ≤ الحالي ≤ ends_at)، ويجب أن تُرجع 5 بانرات كحد أقصى مرتبة حسب sort_order.
-
-**Validates: Requirements 8.1, 8.5**
-
-### Property 13: التحقق من الحد الأدنى لطول سبب الرفض
-
-*لأي* نص مُقدم كسبب رفض، إذا كان طوله أقل من 10 أحرف، يجب أن يرفضه التحقق. إذا كان طوله 10 أحرف أو أكثر، يجب أن يقبله التحقق.
-
-**Validates: Requirements 9.5**
-
-### Property 14: قائمة انتظار الموافقات مرتبة حسب تاريخ التقديم
-
-*لأي* مجموعة طلبات متاجر معلقة، يجب أن تكون القائمة المعروضة مرتبة تصاعدياً حسب تاريخ التقديم (الأقدم أولاً).
-
-**Validates: Requirements 9.6**
+**Validates: Requirements 8.5**
 
 ## Error Handling
 
-### أخطاء جانب العميل
+### Client-Side Errors
 
-| السيناريو | المعالجة |
-|-----------|----------|
-| فشل الشبكة أثناء البحث | عرض النتائج المخزنة مؤقتاً (إن وُجدت) مع شريط "انقطع الاتصال"؛ إعادة المحاولة عند الاتصال |
-| رفع صورة تتجاوز 5 ميجابايت | تحقق من جانب العميل قبل الرفع؛ عرض خطأ مضمن مع حجم الملف |
-| تنسيق رقم هاتف غير صالح | تحقق Zod عند إرسال النموذج؛ عرض خطأ على مستوى الحقل |
-| رفض Supabase RLS | التقاط 403، إعادة التوجيه لتسجيل الدخول أو عرض إشعار "تم رفض الإذن" |
-| عدم تحميل بيانات المجاورات | عرض هيكل تحميل؛ إعادة المحاولة بتراجع أسي (3 محاولات) |
+| Scenario | Handling |
+|----------|----------|
+| Guest user attempts write operation | Show toast "سجل دخول أولاً" with login button; block the operation |
+| Invalid phone number format on login | Inline field error "رقم هاتف غير صالح" |
+| OTP verification fails 3 times | Show error + "إعادة إرسال" button; reset attempt counter |
+| Marketplace form missing required fields | Inline field errors; prevent submission |
+| localStorage quota exceeded | Show toast "المساحة ممتلئة"; suggest clearing old messages |
+| Image too large for base64 storage | Client-side resize before storing; max 500KB |
+| Rating submission for non-existent store | Silently ignore; log to console |
 
-### أخطاء جانب الخادم
+### Edge Cases
 
-| السيناريو | المعالجة |
-|-----------|----------|
-| موافقة على متجر بدون سبب رفض | إرجاع 422 مع خطأ تحقق؛ لوحة الإدارة تعرض خطأ مضمن |
-| اسم متجر مكرر في نفس المجاورة | إرجاع 409 تعارض؛ عرض اقتراح بالتواصل مع المسؤول |
-| فشل رفع صورة البانر | إرجاع 500 مع اقتراح إعادة المحاولة؛ المسؤول يمكنه إعادة الرفع |
-| عدم اتساق خريطة التجاور (اتجاه واحد) | مشغل قاعدة بيانات يضمن الإدراج ثنائي الاتجاه؛ واجهة الإدارة تحذر عند الحفظ |
-
-### الحالات الحدية
-
-| الحالة | السلوك |
-|--------|--------|
-| متجر بدون ساعات عمل | الحالة الافتراضية "مغلق" |
-| مجاورة بدون جيران نشطين | الدائرة تحتوي فقط على المجاورة الأساسية |
-| جميع المجاورات غير نشطة | التطبيق يعرض حالة "قريباً" |
-| انتهاء المميز أثناء الجلسة | جلب البيانات التالي يعكس المستوى الأساسي؛ لا تغييرات أثناء العرض |
-| دوران البانر مع بانر واحد | لا حركة دوران؛ عرض ثابت |
-| رقم واتساب بدون رمز الدولة | التحقق يتطلب بادئة رمز الدولة (+20 لمصر) |
+| Case | Behavior |
+|------|----------|
+| Store with no ratings | Display "لا تقييمات" with empty stars |
+| User favorites empty | Show empty state "لم تضف مفضلات بعد" |
+| Marketplace with no ads | Show empty state "لا توجد إعلانات" with add button |
+| Chat thread with no messages | Show empty state with input field ready |
+| Banner carousel with 0 banners | Hide carousel section entirely |
+| Banner carousel with 1 banner | Show static banner, no rotation |
+| Store owner with no views | Display "0 مشاهدات" |
+| localStorage corrupted/cleared | Gracefully reset to defaults; user re-logs in |
 
 ## Testing Strategy
 
-### اختبارات الخصائص (Property-Based Tests) باستخدام fast-check
+### Property-Based Tests (fast-check)
 
-المشروع يستخدم بالفعل `fast-check` (الإصدار 4.8.0) مع Vitest. اختبارات الخصائص موجودة في `tests/properties/` وتُشغَّل عبر `npm run test:property` مع `FAST_CHECK_NUM_RUNS=200`.
+The project already has `fast-check` v4.8.0 configured with Vitest. Property tests run via `npm run test:property` with 200 iterations.
 
-كل اختبار خاصية سيقوم بـ:
-- تشغيل 100 تكرار كحد أدنى (مُهيأ على 200 عبر متغير البيئة)
-- الإشارة إلى خاصية وثيقة التصميم في تعليق وسم
-- استخدام `fc.assert` مع `fc.property` للتكميم الشامل
+**Test Files:**
+- `tests/properties/mayu-hub/explore-filter.property.test.ts` — Property 2
+- `tests/properties/mayu-hub/ratings.property.test.ts` — Property 3
+- `tests/properties/mayu-hub/favorites.property.test.ts` — Properties 4, 5, 6
+- `tests/properties/mayu-hub/marketplace.property.test.ts` — Properties 7, 8, 9
+- `tests/properties/mayu-hub/messaging.property.test.ts` — Properties 10, 11
+- `tests/properties/mayu-hub/guest-mode.property.test.ts` — Property 1
 
-**ملفات الاختبار:**
-- `tests/properties/mayu-hub/neighborhood-circle.property.test.ts` — الخاصية 1
-- `tests/properties/mayu-hub/search.property.test.ts` — الخاصيتان 2، 3
-- `tests/properties/mayu-hub/store-status.property.test.ts` — الخاصية 6
-- `tests/properties/mayu-hub/validation.property.test.ts` — الخصائص 4، 5، 13
-- `tests/properties/mayu-hub/filtering.property.test.ts` — الخاصيتان 7، 8
-- `tests/properties/mayu-hub/premium.property.test.ts` — الخصائص 9، 10، 11
-- `tests/properties/mayu-hub/banners.property.test.ts` — الخاصية 12
-- `tests/properties/mayu-hub/admin.property.test.ts` — الخاصية 14
+**Tag format:** `// Feature: mayu-hub, Property {N}: {title}`
 
-**تنسيق الوسم:** `// Feature: mayu-hub, Property {N}: {title}`
+Each property test:
+- Runs minimum 100 iterations (configured at 200 via env var)
+- References its design document property in a comment tag
+- Uses `fc.assert` with `fc.property` for universal quantification
 
-### اختبارات الوحدة (Example-Based)
+### Unit Tests (Example-Based)
 
-اختبارات قائمة على الأمثلة لسيناريوهات وحالات حدية محددة:
-- تدفق التسجيل مع/بدون اختيار المجاورة
-- عرض ملف المتجر بتركيبات حقول مختلفة
-- سلوك دوّار البانر (بانر واحد، بدون بانرات)
-- تجميع دليل الخدمات المجتمعية
-- عرض علامة "مميز"
-- إنشاء href لأزرار الاتصال والواتساب
+Example-based tests for specific scenarios and UI interactions:
+- Login flow (phone entry → OTP → success/failure)
+- Guest mode creation and session handling
+- Banner carousel rendering and auto-rotation
+- Side drawer open/close behavior
+- Store detail page rendering with all data combinations
+- Admin panel tab navigation and actions
 
-### اختبارات التكامل
+### Integration Tests
 
-اختبارات تكامل مع Supabase (باستخدام مشروع اختبار أو Supabase محلي):
-- تقديم متجر ← قائمة الانتظار ← الموافقة ← ظهور في البحث
-- تفعيل مجاورة ← إعادة حساب الدائرة
-- جدولة بانر ← انتهاء تلقائي
-- اشتراك مميز ← إنشاء عرض ← انتهاء الصلاحية
-
-### اختبارات E2E (Playwright)
-
-تدفقات شاملة من البداية للنهاية:
-- تسجيل مقيم مع اختيار المجاورة
-- البحث وتصفية الخدمات
-- عرض ملف المتجر والنقر على أزرار واتساب/الهاتف
-- موافقة/رفض المسؤول لطلب متجر
-- إدارة المسؤول للبانرات والمجاورات
+- Full flow: Login → Browse → Rate → Favorite → View favorites
+- Marketplace: Post ad → Filter → View
+- Messaging: Open thread → Send message → View in thread list
+- Admin: Approve store → Verify visible in directory

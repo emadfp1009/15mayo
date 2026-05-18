@@ -1,27 +1,33 @@
 import { useState, useEffect } from 'react'
-import { OnboardingScreen } from '@/components/mayu-hub/OnboardingScreen'
+import { LoginScreen } from '@/components/mayu-hub/LoginScreen'
+import { SideDrawer } from '@/components/mayu-hub/SideDrawer'
 import { ServicesView } from '@/components/mayu-hub/ServicesView'
 import { CommunityDirectory } from '@/components/mayu-hub/CommunityDirectory'
 import { StoreDetail } from '@/components/mayu-hub/StoreDetail'
 import { EmergencyView } from '@/components/mayu-hub/EmergencyView'
 import { AdminPanel } from '@/components/mayu-hub/admin/AdminPanel'
 import { StoreRegistration } from '@/components/mayu-hub/StoreRegistration'
-import { NeighborhoodModal } from '@/components/mayu-hub/NeighborhoodModal'
-import { PromoPopup } from '@/components/mayu-hub/PromoPopup'
 import { ProfileScreen } from '@/components/mayu-hub/ProfileScreen'
+import { FavoritesView } from '@/components/mayu-hub/FavoritesView'
+import { MarketplaceView } from '@/components/mayu-hub/MarketplaceView'
+import { ChatView } from '@/components/mayu-hub/ChatView'
+import { ChatThread } from '@/components/mayu-hub/ChatThread'
+import { StoreDashboard } from '@/components/mayu-hub/StoreDashboard'
 import { getCurrentUser, logout, logActivity } from '@/lib/mayu-hub/auth'
 import type { UserProfile } from '@/lib/mayu-hub/auth'
-import { demoNeighborhoods, demoStores, demoWorkingHours, demoCategories } from '@/lib/mayu-hub/demo-data'
-import { LogOut } from 'lucide-react'
+import { demoNeighborhoods, demoWorkingHours, demoCategories } from '@/lib/mayu-hub/demo-data'
+import { realStores } from '@/lib/mayu-hub/real-data'
+import { Menu } from 'lucide-react'
 import './index.css'
 
-type View = 'onboarding' | 'services' | 'community' | 'store-detail' | 'emergency' | 'admin' | 'register-store' | 'profile'
+type View = 'login' | 'services' | 'community' | 'store-detail' | 'emergency' | 'admin' | 'register-store' | 'profile' | 'favorites' | 'marketplace' | 'messages' | 'chat-thread' | 'my-store'
 
 function App() {
-  const [currentView, setCurrentView] = useState<View>('onboarding')
+  const [currentView, setCurrentView] = useState<View>('login')
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
-  const [showNeighborhoodModal, setShowNeighborhoodModal] = useState(false)
+  const [selectedChatStore, setSelectedChatStore] = useState<{ storeId: string; storeName: string } | null>(null)
+  const [showSideDrawer, setShowSideDrawer] = useState(false)
 
   // Check for existing session on mount
   useEffect(() => {
@@ -34,19 +40,14 @@ function App() {
 
   const handleLoginComplete = (user: UserProfile) => {
     setCurrentUser(user)
-    // Only show neighborhood modal on first ever login (no previous session)
-    const isFirstLogin = !localStorage.getItem('mayu_hub_seen_neighborhood_modal')
-    if (isFirstLogin) {
-      setShowNeighborhoodModal(true)
-      localStorage.setItem('mayu_hub_seen_neighborhood_modal', 'true')
-    }
     setCurrentView('services')
   }
 
   const handleLogout = () => {
     logout()
     setCurrentUser(null)
-    setCurrentView('onboarding')
+    setCurrentView('login')
+    setShowSideDrawer(false)
   }
 
   const handleStoreClick = (storeId: string) => {
@@ -55,7 +56,7 @@ function App() {
 
     // Log activity
     if (currentUser) {
-      const store = demoStores.find(s => s.id === storeId)
+      const store = realStores.find(s => s.id === storeId)
       logActivity({
         userId: currentUser.id,
         userName: currentUser.name,
@@ -66,11 +67,21 @@ function App() {
     }
   }
 
-  const selectedStore = demoStores.find(s => s.id === selectedStoreId)
+  const handleSideNavigation = (view: string) => {
+    setCurrentView(view as View)
+    setShowSideDrawer(false)
+  }
 
-  // Onboarding / Login
-  if (currentView === 'onboarding' || !currentUser) {
-    return <OnboardingScreen onComplete={handleLoginComplete} />
+  const handleOpenThread = (storeId: string, storeName: string) => {
+    setSelectedChatStore({ storeId, storeName })
+    setCurrentView('chat-thread')
+  }
+
+  const selectedStore = realStores.find(s => s.id === selectedStoreId)
+
+  // Login screen
+  if (currentView === 'login' || !currentUser) {
+    return <LoginScreen onComplete={handleLoginComplete} />
   }
 
   return (
@@ -79,9 +90,14 @@ function App() {
       <header className="sticky top-0 z-50 glass border-b border-border/30 px-4 py-3 safe-top">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 gradient-primary rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20">
-              <span className="text-white text-sm font-bold">م</span>
-            </div>
+            {/* Hamburger Menu */}
+            <button
+              onClick={() => setShowSideDrawer(true)}
+              className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="القائمة"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div>
               <h1 className="text-sm font-bold leading-tight">مايو هب</h1>
               <p className="text-[10px] text-muted-foreground">أهلاً {currentUser.name} 👋</p>
@@ -104,13 +120,6 @@ function App() {
                   ⚙️
                 </button>
               )}
-              <button
-                onClick={handleLogout}
-                className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                title="تسجيل خروج"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           )}
         </div>
@@ -119,7 +128,7 @@ function App() {
       {/* Main content */}
       <main className="max-w-lg mx-auto px-4 py-4">
         {currentView === 'services' && (
-          <div className="pb-24 animate-fade-in">
+          <div className="pb-4 animate-fade-in">
             <ServicesView
               primaryNeighborhoodId={currentUser.neighborhoodId}
               onBack={handleLogout}
@@ -129,13 +138,13 @@ function App() {
         )}
 
         {currentView === 'community' && (
-          <div className="pb-24 animate-fade-in">
+          <div className="pb-4 animate-fade-in">
             <CommunityDirectory onBack={() => setCurrentView('services')} />
           </div>
         )}
 
         {currentView === 'emergency' && (
-          <div className="pb-24 animate-fade-in">
+          <div className="pb-4 animate-fade-in">
             <EmergencyView onBack={() => setCurrentView('services')} />
           </div>
         )}
@@ -153,7 +162,7 @@ function App() {
         )}
 
         {currentView === 'profile' && (
-          <div className="pb-24 animate-fade-in">
+          <div className="pb-4 animate-fade-in">
             <ProfileScreen
               user={currentUser}
               onBack={() => setCurrentView('services')}
@@ -175,50 +184,67 @@ function App() {
                   : undefined
               }
               onBack={() => setCurrentView('services')}
+              onMessage={(storeId, storeName) => {
+                setSelectedChatStore({ storeId, storeName })
+                setCurrentView('chat-thread')
+              }}
+            />
+          </div>
+        )}
+
+        {/* New views */}
+        {currentView === 'favorites' && (
+          <div className="pb-4 animate-fade-in">
+            <FavoritesView
+              onBack={() => setCurrentView('services')}
+              onStoreClick={handleStoreClick}
+            />
+          </div>
+        )}
+
+        {currentView === 'marketplace' && (
+          <div className="pb-4 animate-fade-in">
+            <MarketplaceView onBack={() => setCurrentView('services')} />
+          </div>
+        )}
+
+        {currentView === 'messages' && (
+          <div className="pb-4 animate-fade-in">
+            <ChatView
+              onBack={() => setCurrentView('services')}
+              onOpenThread={handleOpenThread}
+            />
+          </div>
+        )}
+
+        {currentView === 'chat-thread' && selectedChatStore && (
+          <div className="pb-4 animate-fade-in">
+            <ChatThread
+              storeId={selectedChatStore.storeId}
+              storeName={selectedChatStore.storeName}
+              onBack={() => setCurrentView('messages')}
+            />
+          </div>
+        )}
+
+        {currentView === 'my-store' && (
+          <div className="pb-4 animate-fade-in">
+            <StoreDashboard
+              onBack={() => setCurrentView('services')}
+              onRegisterStore={() => setCurrentView('register-store')}
             />
           </div>
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      {!['store-detail', 'admin', 'register-store'].includes(currentView) && (
-        <div className="fixed bottom-0 left-0 right-0 glass border-t border-border/30 px-4 pt-2 pb-3 safe-bottom z-50">
-          <div className="max-w-lg mx-auto flex justify-around">
-            {[
-              { view: 'services' as View, icon: '🏪', label: 'الخدمات', color: 'text-primary' },
-              { view: 'emergency' as View, icon: '🆘', label: 'طوارئ', color: 'text-red-500' },
-              { view: 'community' as View, icon: '🏛️', label: 'الدليل', color: 'text-primary' },
-              { view: 'profile' as View, icon: '👤', label: 'حسابي', color: 'text-primary' },
-            ].map(item => (
-              <button
-                key={item.view}
-                onClick={() => setCurrentView(item.view)}
-                className={`flex flex-col items-center gap-0.5 py-1.5 px-5 rounded-2xl transition-all duration-200 ${
-                  currentView === item.view
-                    ? `${item.color} bg-primary/5 scale-105`
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span className="text-xl">{item.icon}</span>
-                <span className={`text-[10px] font-semibold ${currentView === item.view ? '' : 'font-normal'}`}>
-                  {item.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Neighborhood Modal */}
-      {showNeighborhoodModal && (
-        <NeighborhoodModal
-          primaryNeighborhoodId={currentUser.neighborhoodId}
-          onClose={() => setShowNeighborhoodModal(false)}
-        />
-      )}
-
-      {/* Promo Popup */}
-      <PromoPopup onAction={() => setCurrentView('register-store')} />
+      {/* Side Drawer */}
+      <SideDrawer
+        isOpen={showSideDrawer}
+        onClose={() => setShowSideDrawer(false)}
+        currentUser={currentUser}
+        onNavigate={handleSideNavigation}
+        onLogout={handleLogout}
+      />
     </div>
   )
 }

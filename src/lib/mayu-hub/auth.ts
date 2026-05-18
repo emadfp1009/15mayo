@@ -11,6 +11,7 @@ export interface UserProfile {
   pin: string
   neighborhoodId: string
   isAdmin: boolean
+  isGuest?: boolean
   createdAt: string
 }
 
@@ -138,6 +139,30 @@ export function getCurrentUser(): UserProfile | null {
 
 export function logout(): void {
   localStorage.removeItem(CURRENT_USER_KEY)
+}
+
+// ============================================
+// Guest Sessions
+// ============================================
+
+export function createGuestSession(): UserProfile {
+  const guest: UserProfile = {
+    id: `guest-${Date.now()}`,
+    name: 'زائر',
+    username: '',
+    phone: '',
+    pin: '',
+    neighborhoodId: '',
+    isAdmin: false,
+    isGuest: true,
+    createdAt: new Date().toISOString(),
+  }
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(guest))
+  return guest
+}
+
+export function isGuestUser(user: UserProfile): boolean {
+  return user.isGuest === true
 }
 
 // ============================================

@@ -2,6 +2,8 @@ import { Badge } from '@/components/ui/badge'
 import type { StoreProfile } from '@/lib/mayu-hub/types'
 import { getCurrentUser, logActivity } from '@/lib/mayu-hub/auth'
 import { Phone, MessageCircle, Truck, Clock, MapPin } from 'lucide-react'
+import { StarRating } from '@/components/mayu-hub/StarRating'
+import { FavoriteButton } from '@/components/mayu-hub/FavoriteButton'
 
 interface StoreCardProps {
   store: StoreProfile
@@ -21,13 +23,18 @@ export function StoreCard({ store, status, categoryName, neighborhoodName, onCli
     >
       {/* Image Header */}
       <div
-        className="card-bg-image h-36 flex items-end p-4"
+        className="card-bg-image h-36 flex items-end p-4 relative"
         style={{
           background: hasImage
             ? `url(${store.storefrontPhotoUrl}) center/cover`
             : `linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)`
         }}
       >
+        {/* Favorite Button - top right */}
+        <div className="absolute top-2 right-2 z-10">
+          <FavoriteButton storeId={store.id} />
+        </div>
+
         <div className="flex items-end justify-between w-full">
           <div className="flex-1">
             <h3 className="text-white font-bold text-lg leading-tight">{store.nameAr}</h3>
@@ -57,7 +64,10 @@ export function StoreCard({ store, status, categoryName, neighborhoodName, onCli
       </div>
 
       {/* Bottom */}
-      <div className="bg-white p-3">
+      <div className="bg-white p-3 space-y-2">
+        {/* Star Rating */}
+        <StarRating storeId={store.id} readonly size="sm" />
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <a

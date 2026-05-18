@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { demoNeighborhoods, demoCategories } from '@/lib/mayu-hub/demo-data'
 import { validateStoreProfile } from '@/lib/mayu-hub/validation'
+import { getStoreSocial, setStoreSocial } from '@/lib/mayu-hub/local-storage'
 import type { StoreProfileInput, WorkingHoursInput } from '@/lib/mayu-hub/types'
 import { ArrowRight, Store, Check } from 'lucide-react'
 
@@ -30,6 +31,9 @@ export function StoreRegistration({ onBack }: StoreRegistrationProps) {
     delivers: false,
     deliveryCostEgp: '',
     deliveryDurationMinutes: '',
+    facebookUrl: '',
+    instagramUrl: '',
+    whatsappLink: '',
   })
 
   const [workingHours, setWorkingHours] = useState<WorkingHoursInput[]>(
@@ -59,6 +63,20 @@ export function StoreRegistration({ onBack }: StoreRegistrationProps) {
     if (!result.valid) {
       setErrors(result.errors)
       return
+    }
+
+    // Persist social links to localStorage
+    const socialLinks = {
+      facebook: formData.facebookUrl || undefined,
+      instagram: formData.instagramUrl || undefined,
+      whatsapp: formData.whatsappLink || undefined,
+    }
+    const hasSocialLinks = socialLinks.facebook || socialLinks.instagram || socialLinks.whatsapp
+    if (hasSocialLinks) {
+      const existing = getStoreSocial()
+      const storeId = formData.nameAr // Use store name as temporary ID for registration
+      existing[storeId] = socialLinks
+      setStoreSocial(existing)
     }
 
     setErrors({})
@@ -289,6 +307,44 @@ export function StoreRegistration({ onBack }: StoreRegistrationProps) {
             </div>
           </div>
         )}
+      </Card>
+
+      {/* Social Links */}
+      <Card className="p-4 space-y-4">
+        <h3 className="font-semibold text-sm">روابط التواصل الاجتماعي (اختياري)</h3>
+
+        <div className="space-y-2">
+          <Label htmlFor="facebookUrl">فيسبوك</Label>
+          <Input
+            id="facebookUrl"
+            value={formData.facebookUrl}
+            onChange={e => setFormData(prev => ({ ...prev, facebookUrl: e.target.value }))}
+            placeholder="رابط صفحة فيسبوك"
+            dir="ltr"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="instagramUrl">انستجرام</Label>
+          <Input
+            id="instagramUrl"
+            value={formData.instagramUrl}
+            onChange={e => setFormData(prev => ({ ...prev, instagramUrl: e.target.value }))}
+            placeholder="رابط حساب انستجرام"
+            dir="ltr"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="whatsappLink">واتساب</Label>
+          <Input
+            id="whatsappLink"
+            value={formData.whatsappLink}
+            onChange={e => setFormData(prev => ({ ...prev, whatsappLink: e.target.value }))}
+            placeholder="رقم واتساب للمتجر"
+            dir="ltr"
+          />
+        </div>
       </Card>
 
       {/* Submit */}

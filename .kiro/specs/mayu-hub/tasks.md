@@ -1,279 +1,338 @@
-# Implementation Plan: Mayu Hub
+# Implementation Plan: Mayu Hub Upgrade
 
 ## Overview
 
-Mayu Hub is a neighborhood-based local services directory for 15 May City. Implementation follows a bottom-up approach: database schema and types first, then pure logic modules, custom hooks, UI components, and finally the admin panel. Property-based tests validate correctness properties alongside implementation.
+This plan upgrades Mayu Hub from demo-data with Supabase to a localStorage-only PWA with real data. Implementation follows a bottom-up approach: data layer and types first, then pure logic modules with property tests, then custom hooks, UI components, and finally integration/wiring. All new features (ratings, favorites, marketplace, messaging, dashboard, side drawer) are built incrementally.
 
 ## Tasks
 
-- [ ] 1. Set up database schema and TypeScript types
-  - [ ] 1.1 Create Supabase migration for all Mayu Hub tables
-    - Create migration file with tables: `neighborhoods`, `neighborhood_adjacency`, `store_profiles`, `store_working_hours`, `store_delivery_neighborhoods`, `service_categories`, `special_offers`, `banner_ads`, `community_services`, `resident_profiles`
-    - Include all constraints, checks, and indexes as defined in the design
-    - Add database trigger for bidirectional adjacency insertion
-    - _Requirements: 1.1, 2.2, 4.6, 4.7, 6.2, 8.2, 9.2, 10.1_
+- [x] 1. Data layer and types
+  - [x] 1.1 Extend TypeScript types for new features
+    - Add to `src/lib/mayu-hub/types.ts`: `StoreRatings`, `UserFavorites`, `ClassifiedAd`, `ClassifiedAdInput`, `MarketplaceCategory`, `ChatMessage`, `ChatThread`, `StoreViews`, `StoreSocialLinks`, `GuestSession`
+    - Add `ValidationResult` type if not already present
+    - _Requirements: 5.3, 6.6, 7.2, 7.5, 8.1, 8.5, 9.1, 11.3_
 
-  - [ ] 1.2 Create TypeScript type definitions and Zod schemas
-    - Create `src/lib/mayu-hub/types.ts` with all interfaces: `Neighborhood`, `StoreProfile`, `WorkingHours`, `StoreStatusOverride`, `SearchFilters`, `BannerAd`, `CommunityService`, `SpecialOffer`, `StoreProfileInput`, `ValidationResult`
-    - Create `src/lib/mayu-hub/schemas.ts` with Zod validation schemas for store profile input, working hours, and WhatsApp message
-    - _Requirements: 4.7, 4.3_
+  - [x] 1.2 Create localStorage data access module
+    - Create `src/lib/mayu-hub/local-storage.ts` with typed read/write helpers for all new localStorage keys: `mayu_hub_ratings`, `mayu_hub_favorites`, `mayu_hub_marketplace`, `mayu_hub_messages`, `mayu_hub_threads`, `mayu_hub_store_views`, `mayu_hub_store_social`
+    - Include safe JSON parse with fallback defaults
+    - _Requirements: 5.3, 6.6, 7.5, 8.5_
 
-- [ ] 2. Implement pure logic modules
-  - [ ] 2.1 Implement neighborhood circle computation
-    - Create `src/lib/mayu-hub/neighborhood-circle.ts`
-    - Implement `computeNeighborhoodCircle(primaryId, adjacencyMap, activeNeighborhoods)` that returns the primary neighborhood plus all active adjacent neighborhoods
-    - Handle edge cases: inactive primary (return empty), no active neighbors (return only primary)
-    - _Requirements: 2.2, 10.2, 10.4_
+  - [x] 1.3 Switch ServicesView and App.tsx to use real-data.ts
+    - Replace all `demoStores` imports with `realStores` from `real-data.ts` in `ServicesView.tsx` and `App.tsx`
+    - Update `StoreDetail` references to use real-data
+    - Remove dependency on `demo-data.ts` for store listings (keep for neighborhoods/categories/working hours if still needed)
+    - _Requirements: 2.2, 2.3, 13.1, 13.2, 13.3_
 
-  - [ ]* 2.2 Write property test for neighborhood circle (Property 1)
-    - **Property 1: Neighborhood circle respects adjacency and active status**
-    - Create `tests/properties/mayu-hub/neighborhood-circle.property.test.ts`
-    - Generate arbitrary adjacency maps and active sets; verify circle contains only primary + active adjacent, never inactive or non-adjacent
-    - **Validates: Requirements 2.2, 10.2, 10.4**
+- [x] 2. Login screen
+  - [x] 2.1 Create LoginScreen component replacing OnboardingScreen
+    - Create `src/components/mayu-hub/LoginScreen.tsx`
+    - Phone input with +20 prefix, OTP simulation (any 4-digit code = "1234" for demo)
+    - Guest mode button creating temporary session with `isGuest: true`
+    - 3-attempt OTP failure with resend option
+    - Navigate to services view on success (no neighborhood modal)
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1_
 
-  - [ ] 2.3 Implement store status computation
-    - Create `src/lib/mayu-hub/store-status.ts`
-    - Implement `computeStoreStatus(workingHours, currentTime, manualOverride)` with logic: manual override takes priority if not expired; otherwise compare current time against day's working hours; default to 'closed' if no hours configured
-    - _Requirements: 5.2, 5.3, 5.5_
+  - [x] 2.2 Update auth module for guest sessions
+    - Add `isGuest` field to `UserProfile` interface in `auth.ts`
+    - Add `createGuestSession()` function that creates a temporary user with restricted permissions
+    - Add `isGuestUser(user)` helper to check guest status
+    - _Requirements: 1.5, 1.6_
 
-  - [ ]* 2.4 Write property test for store status (Property 6)
-    - **Property 6: Store status computation with manual override priority**
-    - Create `tests/properties/mayu-hub/store-status.property.test.ts`
-    - Generate arbitrary working hours, times, and overrides; verify override priority, time-based computation, and default closed behavior
-    - **Validates: Requirements 5.2, 5.3, 5.5**
+- [x] 3. Pure logic modules for new features
+  - [x] 3.1 Implement ratings computation module
+    - Create `src/lib/mayu-hub/ratings.ts`
+    - Implement `computeAverageRating(ratings: Record<string, number>)` returning `{ average, total }`
+    - Average = arithmetic mean rounded to 1 decimal; empty set returns `{ average: 0, total: 0 }`
+    - _Requirements: 5.3, 5.5_
 
-  - [ ] 2.5 Implement search ranking and filtering
-    - Create `src/lib/mayu-hub/search.ts`
-    - Implement `rankSearchResults(stores, query, primaryNeighborhoodId)` — exact match first, then partial, max 20 results
-    - Implement `filterStores(stores, filters)` — AND logic combining query, category, and neighborhood filters
-    - _Requirements: 3.1, 3.2, 3.3, 3.5_
+  - [ ]* 3.2 Write property test for rating computation (Property 3)
+    - **Property 3: Rating average computation**
+    - Create `tests/properties/mayu-hub/ratings.property.test.ts`
+    - Generate arbitrary sets of ratings (1-5), verify average equals arithmetic mean rounded to 1 decimal
+    - **Validates: Requirements 5.3, 5.5**
 
-  - [ ]* 2.6 Write property tests for search (Properties 2, 3)
-    - **Property 2: Search results ranked exact-first then partial, max 20**
-    - **Property 3: Combined filters use AND logic**
-    - Create `tests/properties/mayu-hub/search.property.test.ts`
-    - Generate arbitrary store lists and queries; verify ordering invariant and max count; verify AND filter semantics
-    - **Validates: Requirements 3.1, 3.5, 3.2, 3.3, 2.1**
+  - [x] 3.3 Implement explore filter module
+    - Create `src/lib/mayu-hub/explore-filter.ts`
+    - Implement `applyExploreFilters(stores, { neighborhoodId, categoryId, deliveryOnly })` with AND logic
+    - All filters optional; when active, results must satisfy all
+    - _Requirements: 3.3, 3.4, 3.5, 3.6_
 
-  - [ ] 2.7 Implement banner filtering logic
-    - Create `src/lib/mayu-hub/banner-rotation.ts`
-    - Implement `getActiveBanners(banners, currentDate)` — filter by date range (starts_at ≤ current ≤ ends_at), sort by sort_order, limit to 5
-    - _Requirements: 8.1, 8.5_
+  - [ ]* 3.4 Write property test for explore filters (Property 2)
+    - **Property 2: Explore filters use AND logic**
+    - Create `tests/properties/mayu-hub/explore-filter.property.test.ts`
+    - Generate arbitrary store lists and filter combinations; verify AND semantics and completeness
+    - **Validates: Requirements 3.3, 3.4, 3.5, 3.6**
 
-  - [ ]* 2.8 Write property test for banner filtering (Property 12)
-    - **Property 12: Active banner filtering by date with max limit**
-    - Create `tests/properties/mayu-hub/banners.property.test.ts`
-    - Generate arbitrary banner sets and dates; verify only date-valid banners returned, max 5, sorted by sort_order
-    - **Validates: Requirements 8.1, 8.5**
+  - [x] 3.5 Implement favorites logic module
+    - Create `src/lib/mayu-hub/favorites.ts`
+    - Implement `toggleFavorite(favorites: string[], storeId: string): string[]`
+    - Implement `isFavorited(favorites: string[], storeId: string): boolean`
+    - Implement `getFavoritesCount(allFavorites: UserFavorites, storeId: string): number`
+    - _Requirements: 6.2, 6.4, 6.5_
 
-  - [ ] 2.9 Implement validation module
-    - Create `src/lib/mayu-hub/validation.ts`
-    - Implement `validateStoreProfile(input)` — enforce mandatory fields (name, phone, neighborhood, working hours), return errors map
-    - Implement `validateWhatsAppMessage(message)` — reject if > 256 characters
-    - Implement `validateRejectionReason(reason)` — reject if < 10 characters
-    - _Requirements: 4.7, 4.3, 9.5_
+  - [ ]* 3.6 Write property tests for favorites (Properties 4, 5, 6)
+    - **Property 4: Favorite toggle is its own inverse**
+    - **Property 5: Favorites view shows exactly favorited stores**
+    - **Property 6: Favorites persistence round-trip**
+    - Create `tests/properties/mayu-hub/favorites.property.test.ts`
+    - Generate arbitrary favorites lists; verify toggle idempotence, view filtering, and persistence round-trip
+    - **Validates: Requirements 6.2, 6.5, 6.6**
 
-  - [ ]* 2.10 Write property tests for validation (Properties 4, 5, 13)
-    - **Property 4: WhatsApp link construction and message validation**
-    - **Property 5: Store profile validation enforces mandatory fields**
-    - **Property 13: Rejection reason minimum length validation**
-    - Create `tests/properties/mayu-hub/validation.property.test.ts`
-    - Generate arbitrary inputs; verify mandatory field enforcement, WhatsApp 256 char limit, rejection reason 10 char minimum
-    - **Validates: Requirements 4.3, 4.7, 9.5**
+  - [x] 3.7 Implement marketplace validation module
+    - Create `src/lib/mayu-hub/marketplace.ts`
+    - Implement `validateClassifiedAd(input: ClassifiedAdInput): ValidationResult`
+    - Reject if title empty/whitespace, price ≤ 0, or phone empty
+    - Implement `filterAdsByCategory(ads: ClassifiedAd[], category: MarketplaceCategory | null): ClassifiedAd[]`
+    - _Requirements: 7.4, 7.7_
 
-  - [ ] 2.11 Implement premium ranking and offer constraints
-    - Add to `src/lib/mayu-hub/search.ts` or create `src/lib/mayu-hub/premium.ts`
-    - Implement premium sorting: premium stores first (ordered by `premiumStartedAt` ascending), then non-premium
-    - Implement `canAddSpecialOffer(activeOfferCount)` — max 5 active offers
-    - Implement `isOfferDurationValid(startsAt, expiresAt)` — max 30 days
-    - Implement `isPremiumExpired(premiumExpiresAt, currentDate)` — check expiration
-    - _Requirements: 7.2, 7.3, 7.5_
+  - [ ]* 3.8 Write property tests for marketplace (Properties 7, 8, 9)
+    - **Property 7: Marketplace ad persistence round-trip**
+    - **Property 8: Marketplace category filter**
+    - **Property 9: Marketplace validation rejects invalid ads**
+    - Create `tests/properties/mayu-hub/marketplace.property.test.ts`
+    - Generate arbitrary ads and inputs; verify persistence, filtering, and validation
+    - **Validates: Requirements 7.3, 7.4, 7.5, 7.7**
 
-  - [ ]* 2.12 Write property tests for premium logic (Properties 9, 10, 11)
-    - **Property 9: Premium stores ranked before non-premium**
-    - **Property 10: Premium offer constraints (max 5, max 30 days)**
-    - **Property 11: Expired premium reverts to basic tier**
-    - Create `tests/properties/mayu-hub/premium.property.test.ts`
-    - Generate arbitrary store lists with mixed premium status; verify ordering, offer limits, and expiration behavior
-    - **Validates: Requirements 7.2, 7.3, 7.5**
+  - [x] 3.9 Implement messaging logic module
+    - Create `src/lib/mayu-hub/messaging.ts`
+    - Implement `sortMessagesByTimestamp(messages: ChatMessage[]): ChatMessage[]`
+    - Implement `createThreadId(userId: string, storeId: string): string`
+    - Implement `getUnreadCount(threads: ChatThread[]): number`
+    - _Requirements: 8.3, 8.5_
 
-  - [ ] 2.13 Implement community service filtering
-    - Create `src/lib/mayu-hub/community-filter.ts`
-    - Implement `filterCommunityServices(services, neighborhoodId, typeFilter)` — AND logic for neighborhood + type filters
-    - Implement `formatCommunityServiceDisplay(service)` — omit null/empty fields, always include name and neighborhood
-    - _Requirements: 6.3, 6.5, 6.6, 6.8_
+  - [ ]* 3.10 Write property tests for messaging (Properties 10, 11)
+    - **Property 10: Messages displayed in chronological order**
+    - **Property 11: Message persistence round-trip**
+    - Create `tests/properties/mayu-hub/messaging.property.test.ts`
+    - Generate arbitrary message sets; verify chronological ordering and persistence round-trip
+    - **Validates: Requirements 8.3, 8.5**
 
-  - [ ]* 2.14 Write property tests for community filtering (Properties 7, 8)
-    - **Property 7: Community service display omits empty fields**
-    - **Property 8: Combined community service filtering uses AND logic**
-    - Create `tests/properties/mayu-hub/filtering.property.test.ts`
-    - Generate arbitrary community services with optional fields; verify display omission and AND filter semantics
-    - **Validates: Requirements 6.3, 6.5, 6.6, 6.8**
-
-- [ ] 3. Checkpoint - Core logic verification
+- [x] 4. Checkpoint - Core logic verification
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Implement Supabase client and custom hooks
-  - [ ] 4.1 Create Supabase client configuration for Mayu Hub
-    - Create `src/lib/mayu-hub/supabase.ts` with typed Supabase client helpers
-    - Add RPC function calls for neighborhood circle queries
-    - _Requirements: 2.2, 3.1_
+- [x] 5. Custom hooks
+  - [x] 5.1 Implement useRatings hook
+    - Create `src/hooks/mayu-hub/useRatings.ts`
+    - Read/write ratings from localStorage using `local-storage.ts` helpers
+    - Expose `averageRating`, `totalRatings`, `userRating`, `submitRating`
+    - Block submission for guest users (return login prompt flag)
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 1.6_
 
-  - [ ] 4.2 Implement useNeighborhoodCircle hook
-    - Create `src/hooks/mayu-hub/useNeighborhoodCircle.ts`
-    - Fetch adjacency data from Supabase, compute circle using pure logic module
-    - Return `{ circle, isLoading }` with TanStack Query caching
-    - _Requirements: 2.1, 2.2, 2.3_
+  - [x] 5.2 Implement useFavorites hook
+    - Create `src/hooks/mayu-hub/useFavorites.ts`
+    - Read/write favorites from localStorage keyed by userId
+    - Expose `favorites`, `isFavorited`, `toggleFavorite`, `getFavoritesCount`
+    - Block toggle for guest users
+    - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 1.6_
 
-  - [ ] 4.3 Implement useStoreStatus hook
-    - Create `src/hooks/mayu-hub/useStoreStatus.ts`
-    - Use `computeStoreStatus` from pure module with current time
-    - Set up interval to refresh status near transition times (within 60 seconds)
-    - _Requirements: 5.1, 5.2, 5.3_
+  - [x] 5.3 Implement useMarketplace hook
+    - Create `src/hooks/mayu-hub/useMarketplace.ts`
+    - Read/write marketplace ads from localStorage
+    - Expose `ads`, `addAd`, `removeAd`, `filterByCategory`
+    - Validate before adding; block for guest users
+    - _Requirements: 7.1, 7.3, 7.4, 7.5, 7.7, 1.6_
 
-  - [ ] 4.4 Implement useServiceSearch hook
-    - Create `src/hooks/mayu-hub/useServiceSearch.ts`
-    - Query approved stores within circle neighborhood IDs from Supabase
-    - Apply `rankSearchResults` and `filterStores` from pure modules
-    - Return `{ results, isLoading, isEmpty }` with debounced query
-    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - [x] 5.4 Implement useMessaging hook
+    - Create `src/hooks/mayu-hub/useMessaging.ts`
+    - Read/write messages and threads from localStorage
+    - Expose `threads`, `getThread`, `sendMessage`, `getUnreadCount`
+    - Block sending for guest users
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 1.6_
 
-  - [ ] 4.5 Implement useActiveBanners hook
-    - Create `src/hooks/mayu-hub/useActiveBanners.ts`
-    - Fetch banners from Supabase, apply `getActiveBanners` filter
-    - Return `{ banners, hasActiveBanners }`
-    - _Requirements: 8.1, 8.4, 8.5_
-
-  - [ ] 4.6 Implement useApprovalQueue hook
-    - Create `src/hooks/mayu-hub/useApprovalQueue.ts`
-    - Fetch pending store profiles sorted by `created_at` ascending
-    - Implement `approve(id)` and `reject(id, reason)` mutations with validation
-    - _Requirements: 9.3, 9.4, 9.5, 9.6_
-
-  - [ ]* 4.7 Write property test for approval queue sorting (Property 14)
-    - **Property 14: Approval queue sorted by submission date**
-    - Create `tests/properties/mayu-hub/admin.property.test.ts`
-    - Generate arbitrary pending submissions; verify ascending date sort
-    - **Validates: Requirements 9.6**
-
-- [ ] 5. Checkpoint - Hooks verification
-  - Ensure all tests pass, ask the user if questions arise.
-
-- [ ] 6. Implement resident-facing UI components
-  - [ ] 6.1 Create NeighborhoodSelector component
-    - Create `src/components/mayu-hub/NeighborhoodSelector.tsx`
-    - Display all 36 neighborhoods in Arabic, allow single selection
-    - Show validation error if no selection on submit
-    - Use shadcn/ui Select or RadioGroup with RTL layout
-    - _Requirements: 1.1, 1.5_
-
-  - [ ] 6.2 Create ServicesView component with neighborhood circle filters
-    - Create `src/components/mayu-hub/ServicesView.tsx`
-    - Display scrollable list of services from neighborhood circle
-    - Show quick-access neighborhood filter chips at top with "All" option
-    - Sort by proximity (primary first, then adjacent)
-    - Show empty state when no services available
-    - _Requirements: 2.1, 2.3, 2.4, 2.5, 2.6_
-
-  - [ ] 6.3 Create StoreCard component
-    - Create `src/components/mayu-hub/StoreCard.tsx`
-    - Display store name, category, neighborhood, status indicator (open/closed)
-    - Show "Premium" badge for premium stores
-    - Show "Closed" label when status is closed
-    - _Requirements: 5.1, 5.4, 7.4_
-
-  - [ ] 6.4 Create StoreDetail page component
-    - Create `src/components/mayu-hub/StoreDetail.tsx`
-    - Display logo (or placeholder), storefront photo, store name, working hours per day
-    - Phone call button and WhatsApp button with deep link
-    - Delivery info section (cost, duration, neighborhoods) if applicable
-    - Special offers section for premium stores
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 7.3_
-
-  - [ ] 6.5 Create SearchBar and search results components
-    - Create `src/components/mayu-hub/SearchBar.tsx` and `src/components/mayu-hub/SearchResults.tsx`
-    - Text input (min 2 chars to trigger), category dropdown, neighborhood filter
-    - Display results with premium stores first, max 20
-    - Show "no results" message with suggestion to remove filters
-    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
-
-  - [ ] 6.6 Create BannerCarousel component
-    - Create `src/components/mayu-hub/BannerCarousel.tsx`
-    - Display up to 5 banners, rotate every 5 seconds
-    - Navigate to store profile or open external link on tap
-    - Hide entirely when no active banners
-    - Use embla-carousel-react for carousel behavior
-    - _Requirements: 8.1, 8.3, 8.4_
-
-  - [ ] 6.7 Create CommunityDirectory component
-    - Create `src/components/mayu-hub/CommunityDirectory.tsx`
-    - Display services grouped by neighborhood
-    - Filter by neighborhood and/or service type
-    - Show school type label for school entries
-    - Omit empty fields from display
-    - Show empty state for no-match filters
-    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
-
-- [ ] 7. Checkpoint - UI components verification
-  - Ensure all tests pass, ask the user if questions arise.
-
-- [ ] 8. Implement admin panel
-  - [ ] 8.1 Create admin layout and store management page
-    - Create `src/components/mayu-hub/admin/AdminLayout.tsx` with navigation
-    - Create `src/components/mayu-hub/admin/StoreManagement.tsx`
-    - List all stores with ability to add, edit, deactivate
-    - Deactivated stores removed from resident-facing views
+  - [x] 5.5 Implement useStoreViews hook
+    - Create `src/hooks/mayu-hub/useStoreViews.ts`
+    - Read/write view counts from localStorage
+    - Expose `viewCount`, `incrementView`
     - _Requirements: 9.1_
 
-  - [ ] 8.2 Create approval queue page
-    - Create `src/components/mayu-hub/admin/ApprovalQueue.tsx`
-    - Display pending submissions sorted by date (oldest first)
-    - Show store name, neighborhood, submission timestamp
-    - Approve button and reject button (with reason input, min 10 chars)
-    - _Requirements: 9.3, 9.4, 9.5, 9.6_
+  - [ ]* 5.6 Write property test for guest mode restrictions (Property 1)
+    - **Property 1: Guest mode restricts all write operations**
+    - Create `tests/properties/mayu-hub/guest-mode.property.test.ts`
+    - Test that all write hooks (rating, favorite, marketplace, messaging) block operations for guest users
+    - **Validates: Requirements 1.6**
 
-  - [ ] 8.3 Create neighborhood management page
-    - Create `src/components/mayu-hub/admin/NeighborhoodManagement.tsx`
-    - Add/edit neighborhoods with name and adjacency relationships
-    - Toggle active/inactive status for phased rollout
-    - Show which neighborhoods are currently active
-    - _Requirements: 9.2, 10.1, 10.3, 10.4_
+- [x] 6. Side drawer and navigation
+  - [x] 6.1 Create SideDrawer component
+    - Create `src/components/mayu-hub/SideDrawer.tsx`
+    - Use shadcn Sheet component, opening from right (RTL)
+    - Display user name and phone at top
+    - Navigation links: الرئيسية, المفضلة, بيع واشتري, رسائل, متجري, الإعدادات, تسجيل خروج
+    - Social media icons at bottom (Facebook, Instagram, WhatsApp)
+    - Close on outside tap or swipe
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2_
 
-  - [ ] 8.4 Create banner management page
-    - Create `src/components/mayu-hub/admin/BannerManagement.tsx`
-    - Create, schedule, and remove banner ads
-    - Require: banner image, target link, start date, end date
-    - Auto-remove expired banners from active rotation
-    - _Requirements: 8.2, 8.5_
+  - [x] 6.2 Update App.tsx with new navigation structure
+    - Replace bottom nav with hamburger menu icon in header triggering SideDrawer
+    - Add new view states: 'favorites', 'marketplace', 'messages', 'chat-thread', 'my-store'
+    - Replace `OnboardingScreen` with `LoginScreen`
+    - Remove `NeighborhoodModal` import and usage
+    - Remove `showNeighborhoodModal` state
+    - Wire all new views to SideDrawer navigation
+    - _Requirements: 2.1, 10.1, 10.2, 10.3_
 
-- [ ] 9. Wire routes and integrate all components
-  - [ ] 9.1 Set up TanStack Router routes for Mayu Hub
-    - Create route files for: `/hub`, `/hub/store/$id`, `/hub/community`, `/hub/search`, `/admin/hub`, `/admin/hub/approvals`, `/admin/hub/neighborhoods`, `/admin/hub/banners`
-    - Wire components to routes with proper data loading
-    - Add neighborhood selection prompt on landing if not set
-    - _Requirements: 1.1, 2.5_
+- [x] 7. Explore filter and banner carousel
+  - [x] 7.1 Create ExploreFilter component
+    - Create `src/components/mayu-hub/ExploreFilter.tsx`
+    - Dropdown labeled "استكشف" with three filter sections: المجاورة, التصنيف, يوصل
+    - Neighborhood dropdown from real neighborhoods data
+    - Category dropdown from categories data
+    - Delivery toggle switch
+    - Clear all button
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-  - [ ] 9.2 Implement registration flow with neighborhood selection
-    - Integrate NeighborhoodSelector into registration flow
-    - Store selected neighborhood in `resident_profiles` table
-    - Allow changing neighborhood from profile settings
-    - Refresh services on neighborhood change within 3 seconds
-    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+  - [x] 7.2 Update BannerCarousel for new requirements
+    - Modify `src/components/mayu-hub/BannerCarousel.tsx`
+    - Set auto-rotation to 4 seconds (was 5)
+    - Add dot indicators for current slide position
+    - Ensure swipe navigation works with embla-carousel-react
+    - Handle tap on store-linked banners to navigate to store detail
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 9.3 Implement store profile submission flow
-    - Create store registration form with mandatory/optional fields
-    - Upload logo and storefront photo to Supabase Storage (max 5MB each)
-    - Submit to pending approval queue
-    - Show pending status to service provider
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 9.3_
+  - [x] 7.3 Update ServicesView with ExploreFilter integration
+    - Add ExploreFilter above store listings (below banner)
+    - Apply `applyExploreFilters` from explore-filter module
+    - Remove old neighborhood circle filter chips (replaced by ExploreFilter)
+    - Show all 30 stores by default when no filters active
+    - _Requirements: 3.1, 3.6, 3.7, 2.2_
 
-  - [ ]* 9.4 Write integration tests for key flows
-    - Test store submission → approval queue → approval → visible in search
-    - Test neighborhood activation → circle recomputation
-    - Test banner scheduling → auto-expiration
-    - _Requirements: 9.3, 9.4, 10.4, 8.5_
+- [x] 8. Star rating system
+  - [x] 8.1 Create StarRating component
+    - Create `src/components/mayu-hub/StarRating.tsx`
+    - Display 1-5 stars (filled/empty based on rating)
+    - Readonly mode for store cards (display average + count)
+    - Interactive mode for store detail (tap to rate)
+    - Use lucide-react Star icon
+    - Show "سجل دخول للتقييم" for guest users
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 1.6_
 
-- [ ] 10. Final checkpoint - Full integration verification
+  - [x] 8.2 Integrate StarRating into StoreCard and StoreDetail
+    - Add StarRating (readonly) to StoreCard showing average and count
+    - Add StarRating (interactive) to StoreDetail page
+    - Wire useRatings hook for data
+    - _Requirements: 5.1, 5.2_
+
+- [x] 9. Favorites/heart system
+  - [x] 9.1 Create FavoriteButton component
+    - Create `src/components/mayu-hub/FavoriteButton.tsx`
+    - Heart icon (lucide-react Heart) - outline when not favorited, filled when favorited
+    - Show favorites count below/beside icon
+    - Toggle on tap; show login prompt for guests
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 1.6_
+
+  - [x] 9.2 Integrate FavoriteButton into StoreCard
+    - Add FavoriteButton to each StoreCard
+    - Wire useFavorites hook
+    - _Requirements: 6.1, 6.2, 6.3, 6.4_
+
+  - [x] 9.3 Create FavoritesView
+    - Create `src/components/mayu-hub/FavoritesView.tsx`
+    - Display only stores the user has favorited using StoreCard components
+    - Show empty state when no favorites
+    - _Requirements: 6.5_
+
+- [x] 10. Marketplace (buy & sell)
+  - [x] 10.1 Create MarketplaceView component
+    - Create `src/components/mayu-hub/MarketplaceView.tsx`
+    - Display list of classified ad cards (title, price, photo thumbnail, date)
+    - Category filter dropdown
+    - "إضافة إعلان" button (blocked for guests)
+    - _Requirements: 7.1, 7.4, 7.6_
+
+  - [x] 10.2 Create MarketplaceForm component
+    - Create `src/components/mayu-hub/MarketplaceForm.tsx`
+    - Form fields: title, description, price, photo upload (base64), phone, category dropdown
+    - Validation: require title, price > 0, phone
+    - Show inline errors on invalid submission
+    - _Requirements: 7.2, 7.3, 7.7_
+
+- [x] 11. Messaging system
+  - [x] 11.1 Create ChatView component (thread list)
+    - Create `src/components/mayu-hub/ChatView.tsx`
+    - Display all active chat threads with store name, last message preview, timestamp
+    - Unread indicator badge on threads with unread messages
+    - Empty state when no threads
+    - _Requirements: 8.4, 8.6_
+
+  - [x] 11.2 Create ChatThread component
+    - Create `src/components/mayu-hub/ChatThread.tsx`
+    - Display messages as bubbles (sent = right/blue, received = left/gray)
+    - Messages in chronological order with timestamps
+    - Text input at bottom for sending new messages
+    - Block sending for guest users
+    - _Requirements: 8.1, 8.2, 8.3, 1.6_
+
+  - [x] 11.3 Add message button to StoreDetail
+    - Add "مراسلة" button to StoreDetail page
+    - On tap, navigate to ChatThread for that store
+    - _Requirements: 8.1_
+
+- [x] 12. Checkpoint - Features verification
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 13. Store owner dashboard
+  - [x] 13.1 Create StoreDashboard component
+    - Create `src/components/mayu-hub/StoreDashboard.tsx`
+    - Display stats: total views, favorites count, average rating
+    - Display recent activity list (from activity logs)
+    - Allow editing store basic info (phone, address, delivery settings)
+    - Show "سجل محلك" prompt for non-owners
+    - _Requirements: 9.1, 9.2, 9.3, 9.4_
+
+- [x] 14. Social media links
+  - [x] 14.1 Create SocialLinks component
+    - Create `src/components/mayu-hub/SocialLinks.tsx`
+    - Display Facebook, Instagram, WhatsApp icons as clickable links
+    - Open in external browser (target="_blank")
+    - Used in StoreDetail for store-specific links
+    - _Requirements: 11.2, 11.4_
+
+  - [x] 14.2 Add social link fields to store registration/edit
+    - Add optional Facebook, Instagram, WhatsApp URL fields to StoreRegistration form
+    - Persist in localStorage under `mayu_hub_store_social`
+    - _Requirements: 11.3_
+
+- [x] 15. Enhanced admin panel
+  - [x] 15.1 Add new tabs to AdminPanel
+    - Add tabs: المتاجر (stores), المستخدمين (users), الإحصائيات (analytics), البانرات (banners), إدارة السوق (marketplace moderation)
+    - Use shadcn Tabs component
+    - _Requirements: 12.1_
+
+  - [x] 15.2 Implement stores management tab
+    - Display pending stores with approve/reject actions
+    - Approve changes status to "approved"
+    - Reject prompts for reason, changes status to "rejected"
+    - _Requirements: 12.2, 12.3, 12.4_
+
+  - [x] 15.3 Implement analytics tab
+    - Display total stores count, total users count, average ratings across all stores
+    - Compute from localStorage data
+    - _Requirements: 12.5_
+
+  - [x] 15.4 Implement banners management tab
+    - Add, edit, remove promotional banners
+    - Store in localStorage under existing `mayu_hub_banners` key
+    - _Requirements: 12.6_
+
+  - [x] 15.5 Implement marketplace moderation tab
+    - Display all ads with remove action
+    - Admin can remove inappropriate ads
+    - _Requirements: 12.7_
+
+- [x] 16. Final integration and cleanup
+  - [x] 16.1 Wire all views in App.tsx
+    - Ensure all new views (favorites, marketplace, messages, chat-thread, my-store) are rendered based on currentView state
+    - Wire SideDrawer navigation to all views
+    - Ensure back navigation works from all views
+    - Remove old unused imports (demo-data for stores, NeighborhoodModal, PromoPopup if replaced)
+    - _Requirements: 10.3, 2.1_
+
+  - [x] 16.2 Update header with hamburger menu
+    - Replace current header buttons with hamburger menu icon (Menu from lucide-react)
+    - Keep "سجل محلك" button in header
+    - Hamburger opens SideDrawer
+    - _Requirements: 10.1_
+
+- [x] 17. Final checkpoint - Full integration verification
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
@@ -282,27 +341,29 @@ Mayu Hub is a neighborhood-based local services directory for 15 May City. Imple
 - Each task references specific requirements for traceability
 - Checkpoints ensure incremental validation
 - Property tests validate universal correctness properties defined in the design document
-- Unit tests validate specific examples and edge cases
 - The project uses Vitest + fast-check (already configured) for property-based testing
-- All UI components should use RTL layout with Arabic-first text
-- Supabase RLS policies should be configured alongside table creation for security
+- All UI components use RTL layout with Arabic-first text
+- All data persistence uses localStorage (no backend/Supabase needed for new features)
+- Guest mode blocks: rating, favoriting, messaging, posting ads
+- Real data source: `src/lib/mayu-hub/real-data.ts` with 30 stores
+
 
 ## Task Dependency Graph
 
 ```json
 {
   "waves": [
-    { "id": 0, "tasks": ["1.1", "1.2"] },
-    { "id": 1, "tasks": ["2.1", "2.3", "2.5", "2.7", "2.9", "2.11", "2.13"] },
-    { "id": 2, "tasks": ["2.2", "2.4", "2.6", "2.8", "2.10", "2.12", "2.14"] },
-    { "id": 3, "tasks": ["4.1"] },
-    { "id": 4, "tasks": ["4.2", "4.3", "4.4", "4.5", "4.6"] },
-    { "id": 5, "tasks": ["4.7"] },
-    { "id": 6, "tasks": ["6.1", "6.2", "6.3", "6.4", "6.5", "6.6", "6.7"] },
-    { "id": 7, "tasks": ["8.1", "8.2", "8.3", "8.4"] },
-    { "id": 8, "tasks": ["9.1"] },
-    { "id": 9, "tasks": ["9.2", "9.3"] },
-    { "id": 10, "tasks": ["9.4"] }
+    { "id": 0, "tasks": ["1.1", "1.2", "1.3"] },
+    { "id": 1, "tasks": ["2.1", "2.2", "3.1", "3.3", "3.5", "3.7", "3.9"] },
+    { "id": 2, "tasks": ["3.2", "3.4", "3.6", "3.8", "3.10"] },
+    { "id": 3, "tasks": ["5.1", "5.2", "5.3", "5.4", "5.5", "5.6"] },
+    { "id": 4, "tasks": ["6.1", "6.2"] },
+    { "id": 5, "tasks": ["7.1", "7.2", "7.3"] },
+    { "id": 6, "tasks": ["8.1", "8.2", "9.1", "9.2", "9.3"] },
+    { "id": 7, "tasks": ["10.1", "10.2", "11.1", "11.2", "11.3"] },
+    { "id": 8, "tasks": ["13.1", "14.1", "14.2"] },
+    { "id": 9, "tasks": ["15.1", "15.2", "15.3", "15.4", "15.5"] },
+    { "id": 10, "tasks": ["16.1", "16.2"] }
   ]
 }
 ```

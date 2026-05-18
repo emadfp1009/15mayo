@@ -128,3 +128,83 @@ export interface ServiceCategory {
   sortOrder: number;
   isActive: boolean;
 }
+
+// === Ratings ===
+export interface StoreRatings {
+  [storeId: string]: {
+    [userId: string]: number; // 1-5
+  };
+}
+
+// === Favorites ===
+export interface UserFavorites {
+  [userId: string]: string[]; // array of storeId
+}
+
+// === Marketplace ===
+export type MarketplaceCategory =
+  | 'electronics' | 'furniture' | 'vehicles' | 'clothing'
+  | 'home_appliances' | 'sports' | 'books' | 'other';
+
+export interface ClassifiedAd {
+  id: string;
+  userId: string;
+  userName: string;
+  title: string;
+  description: string;
+  price: number;
+  photoUrl: string | null;
+  phone: string;
+  category: MarketplaceCategory;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface ClassifiedAdInput {
+  title: string;
+  description: string;
+  price: number;
+  photoUrl: string | null;
+  phone: string;
+  category: MarketplaceCategory;
+}
+
+// === Messaging ===
+export interface ChatMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
+export interface ChatThread {
+  id: string;
+  userId: string;
+  storeId: string;
+  storeName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+// === Store Views ===
+export interface StoreViews {
+  [storeId: string]: number;
+}
+
+// === Social Links ===
+export interface StoreSocialLinks {
+  facebook?: string;
+  instagram?: string;
+  whatsapp?: string;
+}
+
+// === Guest User ===
+export interface GuestSession {
+  id: string;
+  isGuest: true;
+  createdAt: string;
+}

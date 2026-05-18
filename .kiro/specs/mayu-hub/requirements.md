@@ -2,148 +2,184 @@
 
 ## Introduction
 
-Mayu Hub is a service-oriented, geographic, and commercial application dedicated to 15 May City (مدينة 15 مايو). The application connects residents with commercial and community services based on their residential neighborhood (مجاورة سكنية). The city is divided into 36 neighborhoods, and the app provides two main service categories: dynamic commercial services (shops, pharmacies, supermarkets, etc.) and static community/government services (schools, hospitals, post offices, etc.). The goal is to facilitate access to local information, enable direct ordering, and support local commerce.
+مايو هب (Mayu Hub) is a neighborhood services directory PWA serving 15 May City in Egypt. This requirements document covers a comprehensive upgrade: replacing the onboarding flow with phone/OTP login, removing the neighborhood selection modal, adding explore filters, promotional banners, star ratings, favorites, a buy-and-sell marketplace, in-app messaging, store owner dashboards, a side navigation drawer, social media integration, and an enhanced admin panel — all while switching to the real 30-store dataset.
 
 ## Glossary
 
-- **Mayu_Hub**: The main application system that serves as a local services directory for 15 May City
-- **Neighborhood**: One of the 36 residential areas (مجاورات) that divide 15 May City geographically
-- **Neighborhood_Circle**: The set of neighborhoods consisting of a resident's primary neighborhood plus 4-6 geographically surrounding neighborhoods that share a boundary
-- **Resident**: A registered user of the application who lives in 15 May City
-- **Store_Profile**: A commercial service provider's page containing business information, contact details, and operational status
-- **Service_Provider**: A business or shop owner who registers their commercial service on the platform
-- **Community_Service**: A static government or community facility (school, hospital, post office, etc.)
-- **Status_Indicator**: A visual element showing whether a store is currently open or closed
-- **Admin_Panel**: The administrative control interface for managing stores, neighborhoods, and approvals
-- **Premium_Listing**: A paid subscription tier that provides enhanced visibility in search results
-- **Banner_Ad**: A paid advertising space displayed at the top of the application interface
-- **Search_Engine**: The filtered search component that allows finding services by name or neighborhood
+- **App**: The Mayu Hub PWA application
+- **User**: Any person using the App, either authenticated or in guest mode
+- **Store_Owner**: A User who has registered a store listing in the App
+- **Admin**: A User with administrative privileges to manage stores, users, and content
+- **Store**: A business listing in the directory with profile information
+- **Rating_System**: The component responsible for collecting and computing star ratings
+- **Favorites_System**: The component responsible for managing user favorite stores
+- **Marketplace**: The buy-and-sell classified ads section of the App
+- **Messaging_System**: The in-app messaging component for user-to-store communication
+- **Store_Dashboard**: The store owner's management and analytics view
+- **Side_Drawer**: The hamburger menu navigation component
+- **Banner_Carousel**: The auto-rotating promotional banner component at the top of the services view
+- **Explore_Filter**: The dropdown filter component for neighborhood, category, and delivery filtering
+- **Login_Screen**: The authentication screen with phone/OTP and guest mode
+- **Data_Source**: The real-data.ts file containing 30 real store profiles
 
 ## Requirements
 
-### Requirement 1: Neighborhood Selection on Registration
+### Requirement 1: Phone/OTP Login Screen
 
-**User Story:** As a Resident, I want to select my primary neighborhood during registration, so that the app can show me relevant nearby services.
-
-#### Acceptance Criteria
-
-1. WHEN a Resident registers for the first time, THE Mayu_Hub SHALL display a list of all 36 neighborhoods in Arabic, allowing exactly one neighborhood to be selected as the primary neighborhood
-2. WHEN a Resident selects a primary neighborhood and confirms registration, THE Mayu_Hub SHALL store the selected neighborhood as the Resident's home neighborhood and display a confirmation indicating the neighborhood was saved successfully
-3. THE Mayu_Hub SHALL allow a Resident to change their primary neighborhood from their profile settings at any time
-4. WHEN a Resident changes their primary neighborhood from profile settings, THE Mayu_Hub SHALL update the stored home neighborhood and refresh the displayed services to reflect the newly selected neighborhood within 3 seconds
-5. IF a Resident attempts to register without selecting a neighborhood, THEN THE Mayu_Hub SHALL display a validation error indicating that neighborhood selection is required and SHALL prevent registration from completing
-
-### Requirement 2: Neighborhood Circle Display
-
-**User Story:** As a Resident, I want to see services from my neighborhood and surrounding neighborhoods automatically, so that I can discover all accessible services near me.
+**User Story:** As a user, I want to log in with my phone number and OTP verification or continue as a guest, so that I can access the app securely without complex registration.
 
 #### Acceptance Criteria
 
-1. WHEN a Resident opens the app and has a primary neighborhood assigned, THE Mayu_Hub SHALL display a scrollable list of services from the Resident's Neighborhood_Circle, sorted by neighborhood proximity (primary neighborhood first, then adjacent neighborhoods)
-2. THE Mayu_Hub SHALL compute the Neighborhood_Circle as the Resident's primary neighborhood plus all neighborhoods that share a geographic boundary with it in the city's 36-neighborhood adjacency map, resulting in 4 to 6 adjacent neighborhoods depending on the Resident's location
-3. THE Mayu_Hub SHALL display the neighborhoods in the Neighborhood_Circle as quick-access filter options at the top of the services view, including an "All" option that shows services from the entire Neighborhood_Circle
-4. WHEN a Resident selects a specific neighborhood from the quick-access options, THE Mayu_Hub SHALL filter the displayed services to show only services from that selected neighborhood
-5. IF a Resident has no primary neighborhood assigned, THEN THE Mayu_Hub SHALL prompt the Resident to select their neighborhood before displaying services
-6. IF no services are available in the selected neighborhood filter, THEN THE Mayu_Hub SHALL display an empty-state message indicating that no services are currently available in that neighborhood
+1. WHEN a user opens the App for the first time, THE Login_Screen SHALL display a phone number input field with Egyptian country code (+20) pre-filled
+2. WHEN a user enters a valid Egyptian phone number and submits, THE Login_Screen SHALL send a simulated OTP and display an OTP input field
+3. WHEN a user enters the correct OTP, THE Login_Screen SHALL authenticate the user and navigate to the services view
+4. WHEN a user enters an incorrect OTP three times, THE Login_Screen SHALL display an error message and allow re-sending the OTP
+5. WHEN a user taps the guest mode button, THE Login_Screen SHALL create a temporary guest session and navigate to the services view
+6. WHILE a user is in guest mode, THE App SHALL restrict write operations (rating, favoriting, messaging, posting ads) and prompt login
 
-### Requirement 3: Service Search and Filtering
+### Requirement 2: Remove Neighborhood Selection Modal
 
-**User Story:** As a Resident, I want to search for services by name or filter by neighborhood, so that I can quickly find what I need.
-
-#### Acceptance Criteria
-
-1. WHEN a Resident enters at least 2 characters in the Search_Engine, THE Mayu_Hub SHALL return up to 20 matching services within the Neighborhood_Circle, sorted by exact name match first, then partial name match, within 2 seconds
-2. WHEN a Resident applies a neighborhood filter, THE Mayu_Hub SHALL restrict search results to the selected neighborhood
-3. WHEN a Resident selects a service category, THE Search_Engine SHALL filter results to display only services belonging to that category
-4. WHEN no results match the search query, THE Mayu_Hub SHALL display a message indicating no services were found and suggest removing active filters or searching in adjacent neighborhoods
-5. WHEN a Resident applies multiple filters (text query, category, and neighborhood), THE Mayu_Hub SHALL combine all active filters using AND logic, returning only services that satisfy every active filter simultaneously
-
-### Requirement 4: Store Profile Creation and Display
-
-**User Story:** As a Service_Provider, I want to create a store profile with my business details, so that residents can find and contact me.
+**User Story:** As a user, I want to see all available stores immediately after login, so that I can browse the full directory without an extra selection step.
 
 #### Acceptance Criteria
 
-1. THE Store_Profile SHALL display the store logo (maximum file size 5 MB) and storefront photo (maximum file size 5 MB) as visual identity
-2. THE Store_Profile SHALL provide a direct phone call button that initiates a phone call to the store's registered phone number
-3. THE Store_Profile SHALL provide a direct WhatsApp button that opens WhatsApp using a deep link with a pre-filled welcome message configured by the Service_Provider (maximum 256 characters)
-4. THE Store_Profile SHALL display working hours as opening and closing times for each day of the week
-5. IF a Service_Provider indicates that the store offers delivery, THEN THE Store_Profile SHALL display delivery specifications including delivery cost in Egyptian Pounds, available delivery neighborhoods selected from the 36 neighborhoods list, and estimated delivery duration in minutes
-6. WHEN a Service_Provider registers a new store, THE Mayu_Hub SHALL require the Service_Provider to specify the neighborhood where the store is located
-7. WHEN a Service_Provider submits a new Store_Profile, THE Mayu_Hub SHALL require the store name, phone number, neighborhood, and working hours as mandatory fields, and treat logo, storefront photo, WhatsApp number, and delivery specifications as optional fields
-8. IF a Service_Provider does not upload a store logo, THEN THE Store_Profile SHALL display a default placeholder image in place of the logo
+1. WHEN a user completes login or enters guest mode, THE App SHALL navigate directly to the services view without showing a neighborhood selection modal
+2. THE App SHALL display all 30 stores from the Data_Source on the services view by default
+3. WHEN the App loads store data, THE App SHALL use real-data.ts as the primary Data_Source instead of demo-data.ts
 
-### Requirement 5: Store Status Indicator
+### Requirement 3: Explore Filter
 
-**User Story:** As a Resident, I want to see whether a store is currently open or closed, so that I know if I can visit or order now.
+**User Story:** As a user, I want to filter stores by neighborhood, category, or delivery availability, so that I can quickly find relevant services.
 
 #### Acceptance Criteria
 
-1. THE Status_Indicator SHALL display "open" or "closed" status for each Store_Profile
-2. THE Mayu_Hub SHALL compute the Status_Indicator by comparing the store's configured working hours against the current time in the store's configured timezone, and SHALL update the displayed status within 60 seconds of a scheduled opening or closing time
-3. WHEN a Service_Provider manually overrides the status, THE Mayu_Hub SHALL display the manually set status instead of the computed status until the Service_Provider removes the override or until the next scheduled opening or closing transition, whichever comes first
-4. WHILE the Status_Indicator shows "closed", THE Store_Profile SHALL remain visible and SHALL display a "Closed" label distinguishable from the open state
-5. IF a Store_Profile has no configured working hours, THEN THE Status_Indicator SHALL display "closed" by default until the Service_Provider sets working hours or manually overrides the status to "open"
+1. THE Explore_Filter SHALL appear at the top of the services view as a dropdown labeled "استكشف"
+2. WHEN a user opens the Explore_Filter, THE Explore_Filter SHALL display three filter options: المجاورة (neighborhood), التصنيف (category), يوصل (delivers)
+3. WHEN a user selects a neighborhood filter, THE App SHALL display only stores belonging to that neighborhood
+4. WHEN a user selects a category filter, THE App SHALL display only stores matching that category
+5. WHEN a user toggles the delivery filter, THE App SHALL display only stores that offer delivery
+6. WHEN multiple filters are active simultaneously, THE App SHALL display stores matching all active filter criteria (AND logic)
+7. WHEN a user clears all filters, THE App SHALL display all 30 stores from the Data_Source
 
-### Requirement 6: Community and Government Services Directory
+### Requirement 4: Banner Carousel
 
-**User Story:** As a Resident, I want to browse a directory of community and government services in my area, so that I can find schools, hospitals, and public offices.
-
-#### Acceptance Criteria
-
-1. THE Mayu_Hub SHALL display a directory of Community_Service entries organized by neighborhood, showing a list of entries grouped under their respective neighborhood name
-2. THE Mayu_Hub SHALL categorize Community_Service entries by type (schools, post offices, youth centers, mosques, churches, hospitals, police stations, civil registry, gas offices, electricity offices)
-3. WHEN a Resident views a Community_Service entry, THE Mayu_Hub SHALL display the service name, address, phone number, and neighborhood, omitting any field that has no value rather than showing empty or placeholder text
-4. THE Mayu_Hub SHALL label each school entry with its school type (government, experimental, or private) as a visible text indicator within the schools category listing
-5. WHEN a Resident filters Community_Service entries by neighborhood, THE Mayu_Hub SHALL display only services located in the selected neighborhood
-6. WHEN a Resident filters Community_Service entries by service type, THE Mayu_Hub SHALL display only services matching the selected type
-7. IF a Resident applies a filter that matches no Community_Service entries, THEN THE Mayu_Hub SHALL display a message indicating that no services were found for the selected filter criteria
-8. WHEN a Resident selects a neighborhood filter, THE Mayu_Hub SHALL also allow filtering by service type within that neighborhood, and vice versa
-
-### Requirement 7: Premium Listing Subscription
-
-**User Story:** As a Service_Provider, I want to subscribe to a premium listing, so that my store appears at the top of search results and I can post special offers.
+**User Story:** As a user, I want to see promotional banners for featured stores and offers, so that I can discover deals and new services.
 
 #### Acceptance Criteria
 
-1. THE Mayu_Hub SHALL offer a free basic registration tier for all Service_Provider accounts
-2. WHERE a Service_Provider subscribes to a Premium_Listing, THE Mayu_Hub SHALL display the store above all non-premium stores in search results, ordered by subscription start date among multiple premium stores
-3. WHERE a Service_Provider subscribes to a Premium_Listing, THE Mayu_Hub SHALL allow the Service_Provider to publish up to 5 active special offers at a time, each visible to Residents for a duration specified by the Service_Provider up to a maximum of 30 days
-4. THE Mayu_Hub SHALL distinguish promoted results from organic results by displaying a visible "Premium" label on each promoted store listing in the search interface
-5. IF a Premium_Listing subscription expires or is cancelled, THEN THE Mayu_Hub SHALL revert the store to the free basic tier within 24 hours, removing promoted positioning and hiding any active special offers from Residents
+1. THE Banner_Carousel SHALL appear at the top of the services view above the store listings
+2. THE Banner_Carousel SHALL auto-rotate between banner slides every 4 seconds
+3. WHEN a user swipes the Banner_Carousel, THE Banner_Carousel SHALL navigate to the next or previous slide
+4. WHEN a user taps a banner linked to a store, THE App SHALL navigate to that store's detail page
+5. THE Banner_Carousel SHALL display dot indicators showing the current slide position
+6. THE Banner_Carousel SHALL use embla-carousel-react for carousel functionality
 
-### Requirement 8: Banner Advertising
+### Requirement 5: Star Rating
 
-**User Story:** As an advertiser, I want to place banner ads in the app, so that I can promote my business to local residents.
-
-#### Acceptance Criteria
-
-1. THE Mayu_Hub SHALL display a maximum of 5 Banner_Ad slots at the top of the main services view, rotating between active banners every 5 seconds if more than one active Banner_Ad exists
-2. THE Admin_Panel SHALL allow administrators to create, schedule, and remove Banner_Ad placements, requiring at minimum a banner image, a target link (Store_Profile or external URL), a start date, and an end date for each placement
-3. WHEN a Resident taps on a Banner_Ad, THE Mayu_Hub SHALL navigate to the advertiser's Store_Profile or open the configured external link in the device's default browser
-4. IF no active Banner_Ad placements exist for the current date, THEN THE Mayu_Hub SHALL hide the banner section entirely from the main services view
-5. IF a Banner_Ad's scheduled end date has passed, THEN THE Admin_Panel SHALL automatically remove the Banner_Ad from the active rotation without requiring manual administrator action
-
-### Requirement 9: Admin Panel for Store and Neighborhood Management
-
-**User Story:** As an administrator, I want to manage stores and neighborhoods through a control panel, so that I can maintain data quality and approve new registrations.
+**User Story:** As a user, I want to rate stores with 1-5 stars and see average ratings, so that I can share my experience and make informed choices.
 
 #### Acceptance Criteria
 
-1. THE Admin_Panel SHALL allow administrators to add, edit, and deactivate Store_Profile entries, where deactivating a Store_Profile removes it from Resident-facing search results and directory views
-2. THE Admin_Panel SHALL allow administrators to add and edit neighborhood data including name and geographic adjacency relationships for each of the 36 neighborhoods
-3. WHEN a Service_Provider submits a new Store_Profile, THE Admin_Panel SHALL place the submission in a pending approval queue and THE Mayu_Hub SHALL display a pending status indicator to the Service_Provider
-4. WHEN an administrator approves a pending Store_Profile submission, THE Mayu_Hub SHALL make the Store_Profile visible to Residents in search results and notify the Service_Provider that their submission has been approved
-5. IF an administrator rejects a Store_Profile submission, THEN THE Admin_Panel SHALL require the administrator to provide a rejection reason of at least 10 characters, and THE Mayu_Hub SHALL notify the Service_Provider with the rejection reason
-6. THE Admin_Panel SHALL display the pending approval queue sorted by submission date, showing the store name, neighborhood, and submission timestamp for each entry
+1. WHEN a user views a store card, THE App SHALL display the store's average star rating (1-5) and total number of ratings
+2. WHEN a user views a store detail page, THE App SHALL display the average rating and allow the user to submit a rating
+3. WHEN a user submits a star rating, THE Rating_System SHALL persist the rating in localStorage and recalculate the store's average
+4. WHEN a user has already rated a store, THE Rating_System SHALL display the user's previous rating and allow updating it
+5. THE Rating_System SHALL compute the average rating as the arithmetic mean of all ratings for that store, rounded to one decimal place
 
-### Requirement 10: Phased Neighborhood Rollout
+### Requirement 6: Heart/Favorite
 
-**User Story:** As an administrator, I want to launch the app with a subset of neighborhoods and expand gradually, so that I can validate the concept before full deployment.
+**User Story:** As a user, I want to favorite stores and view my favorites, so that I can quickly access stores I prefer.
 
 #### Acceptance Criteria
 
-1. THE Admin_Panel SHALL allow administrators to mark neighborhoods as active or inactive
-2. WHILE a neighborhood is marked as inactive, THE Mayu_Hub SHALL exclude that neighborhood from search results and the Neighborhood_Circle computation
-3. THE Mayu_Hub SHALL launch with 5 to 6 active neighborhoods as the initial deployment
-4. WHEN an administrator activates a new neighborhood, THE Mayu_Hub SHALL immediately include that neighborhood in relevant Neighborhood_Circle computations for adjacent active neighborhoods
+1. WHEN a user views a store card, THE App SHALL display a heart icon button for favoriting
+2. WHEN a user taps the heart icon, THE Favorites_System SHALL toggle the favorite state and persist it in localStorage
+3. WHEN a store is favorited, THE App SHALL display a filled heart icon on that store's card
+4. THE App SHALL display the total favorites count on each store card
+5. WHEN a user navigates to the favorites section, THE App SHALL display only stores the user has favorited
+6. THE Favorites_System SHALL persist all favorite data in localStorage keyed by user ID
+
+### Requirement 7: Buy and Sell Marketplace
+
+**User Story:** As a user, I want to post items for sale and browse classified ads, so that I can buy and sell within my community.
+
+#### Acceptance Criteria
+
+1. WHEN a user navigates to the Marketplace section, THE App SHALL display a list of classified ad cards
+2. WHEN a user taps "إضافة إعلان" (Add Ad), THE Marketplace SHALL display a form with fields: title, description, price, photo upload, phone number, and category
+3. WHEN a user submits a valid ad form, THE Marketplace SHALL create the ad and add it to the listings
+4. WHEN a user selects a category filter in the Marketplace, THE Marketplace SHALL display only ads matching that category
+5. THE Marketplace SHALL persist all ad data in localStorage
+6. WHEN a user views an ad card, THE Marketplace SHALL display the title, price, photo thumbnail, and posting date
+7. IF a user attempts to post an ad without a title or price, THEN THE Marketplace SHALL display validation errors and prevent submission
+
+### Requirement 8: In-App Messaging
+
+**User Story:** As a user, I want to send messages to store owners, so that I can inquire about products or services directly within the app.
+
+#### Acceptance Criteria
+
+1. WHEN a user taps "مراسلة" (Message) on a store detail page, THE Messaging_System SHALL open a chat thread with that store
+2. WHEN a user sends a message, THE Messaging_System SHALL display it as a sent bubble in the chat thread
+3. THE Messaging_System SHALL display messages in chronological order with timestamps
+4. WHEN a user navigates to the messages section, THE Messaging_System SHALL display a list of all active chat threads
+5. THE Messaging_System SHALL persist all message data in localStorage
+6. WHEN a new message is received in a thread, THE Messaging_System SHALL display an unread indicator on the messages section
+
+### Requirement 9: Store Owner Dashboard
+
+**User Story:** As a store owner, I want to see my store's performance stats and manage my listing, so that I can understand my reach and keep my information current.
+
+#### Acceptance Criteria
+
+1. WHEN a Store_Owner navigates to "متجري" (My Store), THE Store_Dashboard SHALL display the store's total views, favorites count, and average rating
+2. WHEN a Store_Owner views the dashboard, THE Store_Dashboard SHALL display a list of recent activity (views, ratings) for their store
+3. THE Store_Dashboard SHALL allow the Store_Owner to edit their store's basic information (phone, address, delivery settings)
+4. IF a user who is not a Store_Owner navigates to "متجري", THEN THE App SHALL display a prompt to register a store
+
+### Requirement 10: Side Navigation Drawer
+
+**User Story:** As a user, I want a side menu with all navigation options, so that I can access all app sections from one place.
+
+#### Acceptance Criteria
+
+1. WHEN a user taps the hamburger menu icon, THE Side_Drawer SHALL slide in from the right side (RTL layout)
+2. THE Side_Drawer SHALL display navigation links: الرئيسية, المفضلة, بيع واشتري, رسائل, متجري, الإعدادات, تسجيل خروج
+3. WHEN a user taps a navigation link in the Side_Drawer, THE App SHALL navigate to the corresponding section and close the drawer
+4. WHEN a user taps outside the Side_Drawer or swipes it closed, THE Side_Drawer SHALL close with an animation
+5. THE Side_Drawer SHALL display the user's name and phone number at the top
+
+### Requirement 11: Social Media Links
+
+**User Story:** As a user, I want to access the app's social media pages and see store social links, so that I can stay connected with the community and individual stores.
+
+#### Acceptance Criteria
+
+1. THE Side_Drawer SHALL display social media icons (Facebook, Instagram, WhatsApp) linking to the app's official pages
+2. WHEN a user taps a social media icon, THE App SHALL open the corresponding social media page in an external browser
+3. WHEN a Store_Owner registers or edits a store, THE App SHALL provide optional fields for Facebook, Instagram, and WhatsApp links
+4. WHEN a user views a store detail page with social links, THE App SHALL display clickable social media icons for that store
+
+### Requirement 12: Enhanced Admin Panel
+
+**User Story:** As an admin, I want comprehensive management tools, so that I can approve stores, manage users, view analytics, manage banners, and moderate marketplace content.
+
+#### Acceptance Criteria
+
+1. WHEN an Admin navigates to the admin panel, THE App SHALL display tabs for: stores, users, analytics, banners, and marketplace moderation
+2. WHEN an Admin views the stores tab, THE App SHALL display pending store registrations with approve/reject actions
+3. WHEN an Admin approves a store, THE App SHALL change the store status to "approved" and make it visible in the directory
+4. WHEN an Admin rejects a store, THE App SHALL prompt for a rejection reason and change the store status to "rejected"
+5. WHEN an Admin views the analytics tab, THE App SHALL display total stores count, total users count, and average ratings across all stores
+6. WHEN an Admin views the banners tab, THE App SHALL allow adding, editing, and removing promotional banners
+7. WHEN an Admin views the marketplace moderation tab, THE App SHALL display reported or flagged ads with remove actions
+
+### Requirement 13: Use Real Data Source
+
+**User Story:** As a developer, I want the app to use real-data.ts as the primary data source, so that the app displays actual store information for 15 May City.
+
+#### Acceptance Criteria
+
+1. THE App SHALL import and use the realStores array from real-data.ts as the primary store data source
+2. THE App SHALL display all 30 stores from real-data.ts in the services view
+3. WHEN the App references store data for any feature (ratings, favorites, search, filters), THE App SHALL operate on the real-data.ts dataset
