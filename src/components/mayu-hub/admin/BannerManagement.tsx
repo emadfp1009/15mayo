@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { uploadBannerImage } from '@/lib/mayu-hub/storage'
@@ -6,10 +6,25 @@ import { demoBanners } from '@/lib/mayu-hub/demo-data'
 import type { BannerAd } from '@/lib/mayu-hub/types'
 import { Upload, Trash2, Loader2 } from 'lucide-react'
 
+const BANNERS_KEY = 'mayu_hub_banners'
+
+function getSavedBanners(): BannerAd[] {
+  const data = localStorage.getItem(BANNERS_KEY)
+  if (data) return JSON.parse(data)
+  // First time: use demo banners
+  localStorage.setItem(BANNERS_KEY, JSON.stringify(demoBanners))
+  return demoBanners
+}
+
 export function BannerManagement() {
-  const [banners, setBanners] = useState<BannerAd[]>(demoBanners)
+  const [banners, setBanners] = useState<BannerAd[]>(getSavedBanners())
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+
+  // Save to localStorage whenever banners change
+  useEffect(() => {
+    localStorage.setItem(BANNERS_KEY, JSON.stringify(banners))
+  }, [banners])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
