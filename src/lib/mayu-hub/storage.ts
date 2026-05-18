@@ -5,7 +5,7 @@
 
 import { supabase } from './supabase'
 
-const BUCKET_NAME = 'mayu Hup'
+const BUCKET_NAME = 'mayuhub'
 
 /**
  * Upload an image file to Supabase Storage
