@@ -37,11 +37,12 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
     [circleIds]
   )
 
-  // Get active banners
-  const activeBanners = useMemo(
-    () => getActiveBanners(demoBanners, new Date()),
-    []
-  )
+  // Get active banners - from localStorage (admin managed) or demo
+  const activeBanners = useMemo(() => {
+    const saved = localStorage.getItem('mayu_hub_banners')
+    const bannerList = saved ? JSON.parse(saved) : demoBanners
+    return getActiveBanners(bannerList, new Date())
+  }, [])
 
   // Filter and rank stores
   const filteredStores = useMemo(() => {
