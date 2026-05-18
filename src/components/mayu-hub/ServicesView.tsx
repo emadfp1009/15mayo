@@ -93,7 +93,7 @@ export function ServicesView({ primaryNeighborhoodId, onBack, onStoreClick }: Se
       </div>
 
       {/* Banner carousel */}
-      <BannerCarousel banners={activeBanners} />
+      <BannerCarousel banners={activeBanners} onStoreClick={onStoreClick} />
 
       {/* Categories - circular scrollable */}
       <CategoryScroller

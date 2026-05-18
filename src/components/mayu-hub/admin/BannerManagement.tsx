@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { uploadBannerImage } from '@/lib/mayu-hub/storage'
-import { demoBanners } from '@/lib/mayu-hub/demo-data'
+import { demoBanners, demoStores } from '@/lib/mayu-hub/demo-data'
 import type { BannerAd } from '@/lib/mayu-hub/types'
 import { Upload, Trash2, Loader2 } from 'lucide-react'
 
@@ -20,6 +20,7 @@ export function BannerManagement() {
   const [banners, setBanners] = useState<BannerAd[]>(getSavedBanners())
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedStore, setSelectedStore] = useState('')
 
   // Save to localStorage whenever banners change
   useEffect(() => {
@@ -39,9 +40,9 @@ export function BannerManagement() {
       const newBanner: BannerAd = {
         id: `banner-${Date.now()}`,
         imageUrl,
-        targetType: 'external',
-        targetStoreId: null,
-        targetUrl: '#',
+        targetType: 'store',
+        targetStoreId: selectedStore || null,
+        targetUrl: null,
         startsAt: new Date().toISOString().split('T')[0],
         endsAt: '2026-12-31',
         isActive: true,
@@ -88,7 +89,22 @@ export function BannerManagement() {
 
       {/* Upload new */}
       {banners.length < 6 && (
-        <Card className="p-6">
+        <Card className="p-6 space-y-4">
+          {/* Select store to link */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">ربط البانر بمتجر (إعلان)</label>
+            <select
+              value={selectedStore}
+              onChange={e => setSelectedStore(e.target.value)}
+              className="w-full h-10 rounded-xl border px-3 text-sm bg-white"
+            >
+              <option value="">بدون ربط</option>
+              {demoStores.filter(s => s.status === 'approved').map(s => (
+                <option key={s.id} value={s.id}>{s.nameAr}</option>
+              ))}
+            </select>
+          </div>
+
           <label className="flex flex-col items-center gap-3 cursor-pointer">
             <input
               type="file"

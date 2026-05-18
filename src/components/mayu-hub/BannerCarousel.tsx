@@ -4,9 +4,10 @@ import { getSettings } from '@/lib/mayu-hub/settings'
 
 interface BannerCarouselProps {
   banners: BannerAd[]
+  onStoreClick?: (storeId: string) => void
 }
 
-export function BannerCarousel({ banners }: BannerCarouselProps) {
+export function BannerCarousel({ banners, onStoreClick }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const settings = getSettings()
   const rotationMs = (settings.bannerRotationSeconds || 3) * 1000
@@ -34,10 +35,15 @@ export function BannerCarousel({ banners }: BannerCarouselProps) {
         {banners.map((banner) => (
           <a
             key={banner.id}
-            href={banner.targetType === 'external' ? banner.targetUrl ?? '#' : `#store-${banner.targetStoreId}`}
+            href={banner.targetType === 'external' ? banner.targetUrl ?? '#' : undefined}
             target={banner.targetType === 'external' ? '_blank' : undefined}
             rel={banner.targetType === 'external' ? 'noopener noreferrer' : undefined}
-            className="w-full flex-shrink-0"
+            onClick={() => {
+              if (banner.targetType === 'store' && banner.targetStoreId && onStoreClick) {
+                onStoreClick(banner.targetStoreId)
+              }
+            }}
+            className="w-full flex-shrink-0 cursor-pointer"
           >
             <img
               src={banner.imageUrl}
